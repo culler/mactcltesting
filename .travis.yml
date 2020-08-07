@@ -18,9 +18,12 @@ jobs:
         - BUILD_DIR=macosx
       install: []
       script: &mactest
-        # - make -C macosx all
+        - make -C macosx
+	- pwd
+	- ls generic
+	- ls -l generic/tclTest.c
         # The styles=develop avoids some weird problems on OSX
-        - make -C macosx test
+        - make -C macosx test styles=develop
     - name: "macOS/Xcode 11/Shared"
       os: osx
       osx_image: xcode11
