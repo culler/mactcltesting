@@ -9,57 +9,63 @@ addons:
     packages:
       - libtommath
     update: true
+
 matrix:
   include:
-# Testing on Mac, various styles
     - name: "macOS/Xcode 11.5/Shared"
       os: osx
       osx_image: xcode11.5
       env:
-        - BUILD_DIR=macosx
+        - BUILD_DIR=$HOME/mactesting/macosx
+        - UNIX_DIR=$HOME/mactesting/unix
+      install: []
       script: &mactest
-        - make all
+        - cd $BUILD_DOR
+        - make
         # The styles=develop avoids some weird problems on OSX
         - make test styles=develop
-    - name: "macOS/Xcode 11.5/Shared/Unix-like"
-      os: osx
-      osx_image: xcode11.5
-      env:
-        - BUILD_DIR=macosx
+
 # Older MacOS versions
-    - name: "macOS/Xcode 11/Shared"
+
+   - name: "macOS/Xcode 11/Shared"
       os: osx
       osx_image: xcode11
       env:
-        - BUILD_DIR=macosx
+        - BUILD_DIR=$HOME/mactesting/macosx
+        - UNIX_DIR=$HOME/mactesting/unix
+      install: []
       script: *mactest
-    - name: "macOS/Xcode 10/Shared"
+
+   - name: "macOS/Xcode 10/Shared"
       os: osx
       osx_image: xcode10.3
       env:
-        - BUILD_DIR=macosx
+        - BUILD_DIR=$HOME/mactesting/macosx
+        - UNIX_DIR=$HOME/mactesting/unix
+      install: []
       script: *mactest
-    - name: "macOS/Xcode 9/Shared"
+
+   - name: "macOS/Xcode 9/Shared"
       os: osx
       osx_image: xcode9.2
       env:
-        - BUILD_DIR=macosx
+        - BUILD_DIR=$HOME/mactesting/macosx
+        - UNIX_DIR=$HOME/mactesting/unix
+      install: []
       script: *mactest
-    - name: "macOS/Xcode 8/Shared"
+
+   - name: "macOS/Xcode 8/Shared"
       os: osx
       osx_image: xcode8.3
       env:
-        - BUILD_DIR=macosx
+        - BUILD_DIR=$HOME/mactesting/macosx
+        - UNIX_DIR=$HOME/mactesting/unix
       install: []
       script: *mactest
+
 before_install:
 install:
 before_script:
   - export ERROR_ON_FAILURES=1
-  - cd $BUILD_DIR
-  - pwd
-  - ls
-script:
-  - make all tcltest
-  - make test
+
 
