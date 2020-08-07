@@ -57,10 +57,12 @@ matrix:
       install: []
       script: *mactest
 before_install:
+  - mkdir "$HOME/install_dir"
+  - cd unix
+  - ./configure ${CFGOPT} "--prefix=$HOME/install_dir" || (cat config.log && exit 1)
+  - cd ..
   - cd ${BUILD_DIR}
 install:
-  - mkdir "$HOME/install_dir"
-  - ./configure ${CFGOPT} "--prefix=$HOME/install_dir" || (cat config.log && exit 1)
 before_script:
   - export ERROR_ON_FAILURES=1
 script:
