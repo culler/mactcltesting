@@ -7,7 +7,7 @@ addons:
   homebrew:
     packages:
       - libtommath
-    update: true
+    update: false
 jobs:
   include:
 # Testing on Mac, various styles
@@ -18,9 +18,9 @@ jobs:
         - BUILD_DIR=macosx
       install: []
       script: &mactest
-        - make -C macosx
+        # - make -C macosx all
         # The styles=develop avoids some weird problems on OSX
-        - make -C macosx test styles=develop
+        - make -C macosx test
     - name: "macOS/Xcode 11/Shared"
       os: osx
       osx_image: xcode11
