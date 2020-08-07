@@ -54,13 +54,14 @@ matrix:
       osx_image: xcode8.3
       env:
         - BUILD_DIR=macosx
+	- SOURCE_DIR=macosx
       install: []
       script: *mactest
 before_install:
   - cd ${BUILD_DIR}
 install:
-  - mkdir "$HOME/install dir"
-  - ./configure ${CFGOPT} "--prefix=$HOME/install dir" || (cat config.log && exit 1)
+  - mkdir "$HOME/install_dir"
+  - ./configure ${CFGOPT} "--prefix=$HOME/install_dir" || (cat config.log && exit 1)
 before_script:
   - export ERROR_ON_FAILURES=1
 script:
