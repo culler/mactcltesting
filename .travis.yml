@@ -19,7 +19,6 @@ jobs:
       install: []
       script: &mactest
         - make -C macosx
-	- pwd
         # The styles=develop avoids some weird problems on OSX
         - make -C macosx test styles=develop
     - name: "macOS/Xcode 11/Shared"
