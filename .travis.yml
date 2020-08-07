@@ -1,5 +1,5 @@
-sudo: false
 language: c
+os: osx
 cache:
   directories:
     - $HOME/Library/Caches/Homebrew
@@ -10,61 +10,44 @@ addons:
       - libtommath
     update: true
 
-matrix:
+jobs:
   include:
     - name: "macOS/Xcode 11.5/Shared"
-      os: osx
       osx_image: xcode11.5
-      env:
-        - BUILD_DIR=$HOME/mactcltesting/macosx
-        - UNIX_DIR=$HOME/mactcltesting/unix
       install: []
       script: &mactest
-        - cd $BUILD_DOR
+        - cd macosx
         - make
         # The styles=develop avoids some weird problems on OSX
         - make test styles=develop
+	- cd ..
 
 # Older MacOS versions
 
    - name: "macOS/Xcode 11/Shared"
-      os: osx
       osx_image: xcode11
-      env:
-        - BUILD_DIR=$HOME/mactcltesting/macosx
-        - UNIX_DIR=$HOME/mactcltesting/unix
       install: []
       script: *mactest
 
    - name: "macOS/Xcode 10/Shared"
-      os: osx
       osx_image: xcode10.3
-      env:
-        - BUILD_DIR=$HOME/mactcltesting/macosx
-        - UNIX_DIR=$HOME/mactcltesting/unix
       install: []
       script: *mactest
 
    - name: "macOS/Xcode 9/Shared"
-      os: osx
       osx_image: xcode9.2
-      env:
-        - BUILD_DIR=$HOME/mactcltesting/macosx
-        - UNIX_DIR=$HOME/mactcltesting/unix
       install: []
       script: *mactest
 
    - name: "macOS/Xcode 8/Shared"
-      os: osx
       osx_image: xcode8.3
-      env:
-        - BUILD_DIR=$HOME/mactcltesting/macosx
-        - UNIX_DIR=$HOME/mactcltesting/unix
       install: []
       script: *mactest
 
 before_install:
+
 install:
+
 before_script:
   - export ERROR_ON_FAILURES=1
 
