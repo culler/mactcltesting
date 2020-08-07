@@ -19,8 +19,10 @@ jobs:
       install: []
       script: &mactest
         - make -C macosx
+        - ls generic
+        - ls -l generic/tkTest.c
         # The styles=develop avoids some weird problems on OSX
-        - make -C macosx test styles=develop
+        # - make -C macosx test styles=develop
     - name: "macOS/Xcode 11/Shared"
       os: osx
       osx_image: xcode11
