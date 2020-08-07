@@ -21,7 +21,6 @@ jobs:
         - make -C macosx
 	- pwd
 	- ls generic
-	- ls -l generic/tkTest.c
         # The styles=develop avoids some weird problems on OSX
         - make -C macosx test styles=develop
     - name: "macOS/Xcode 11/Shared"
