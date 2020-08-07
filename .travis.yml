@@ -7,7 +7,7 @@ addons:
   homebrew:
     packages:
       - libtommath
-    update: false
+    update: true
 jobs:
   include:
 # Testing on Mac, various styles
