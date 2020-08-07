@@ -18,11 +18,11 @@ jobs:
         - BUILD_DIR=macosx
       install: []
       script: &mactest
-        - make -C macosx
+        - cd BUILD_DIR
+        - make
         # The styles=develop avoids some weird problems on OSX
-	- pwd
-	- ls
-        # - make -C macosx test styles=develop
+        - make test styles=develop
+	- cd ..
     - name: "macOS/Xcode 11/Shared"
       os: osx
       osx_image: xcode11
