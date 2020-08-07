@@ -18,9 +18,9 @@ jobs:
         - BUILD_DIR=macosx
       install: []
       script: &mactest
-        - make all
+        - make -C macosx
         # The styles=develop avoids some weird problems on OSX
-        - make test styles=develop
+        - make -C macosx test styles=develop
     - name: "macOS/Xcode 11/Shared"
       os: osx
       osx_image: xcode11
@@ -50,13 +50,13 @@ jobs:
       install: []
       script: *mactest
 before_install:
-  - cd ${BUILD_DIR}
+#  - cd ${BUILD_DIR}
 install:
-  - mkdir "$HOME/install dir"
-  - ./configure ${CFGOPT} "--prefix=$HOME/install dir" || (cat config.log && exit 1)
+#  - mkdir "$HOME/install dir"
+#  - ./configure ${CFGOPT} "--prefix=$HOME/install dir" || (cat config.log && exit 1)
 before_script:
   - export ERROR_ON_FAILURES=1
 script:
-  - make
-  - make test
+#  - make
+#  - make test
 #  - make install
