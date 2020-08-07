@@ -1,4 +1,8 @@
 language: c
+cache:
+  directories:
+    - $HOME/Library/Caches/Homebrew
+    - /usr/local/Homebrew
 addons:
   homebrew:
     packages:
