@@ -56,8 +56,10 @@ before_install:
 install:
 before_script:
   - export ERROR_ON_FAILURES=1
-script:
   - cd $BUILD_DIR
+  - pwd
+  - ls
+script:
   - make all tcltest
   - make test
 
