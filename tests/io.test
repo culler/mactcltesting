@@ -6766,9 +6766,6 @@ test io-50.3 {testing handler deletion with multiple handlers} -constraints test
 } -body {
     set f [open $path(test1) w]
     close $f
-    set f [open $path(test1) r]
-    testchannelevent $f add readable [namespace code [list notcalled $f 1]]
-    testchannelevent $f add readable [namespace code [list delhandler $f 0]]
     set z ""
     proc notcalled {f i} {
 	variable z
@@ -6783,6 +6780,10 @@ test io-50.3 {testing handler deletion with multiple handlers} -constraints test
     }
     set z ""
     update
+    set f [open $path(test1) r]
+    testchannelevent $f add readable [namespace code [list notcalled $f 1]]
+    testchannelevent $f add readable [namespace code [list delhandler $f 0]]
+    update
     string compare [string tolower $z] \
 	[list [list delhandler $f 0 called] \
 	      [list delhandler $f 0 deleted myself]]
@@ -6794,8 +6795,6 @@ test io-50.4 {testing handler deletion vs reentrant calls} -constraints testchan
 } -body {
     set f [open $path(test1) w]
     close $f
-    set f [open $path(test1) r]
-    testchannelevent $f add readable [namespace code [list delrecursive $f]]
     proc delrecursive {f} {
 	variable z
 	variable u
@@ -6811,6 +6810,9 @@ test io-50.4 {testing handler deletion vs reentrant calls} -constraints testchan
     variable u toplevel
     variable z ""
     update
+    set f [open $path(test1) r]
+    testchannelevent $f add readable [namespace code [list delrecursive $f]]
+    update
     set z
 } -cleanup {
     close $f
@@ -6820,9 +6822,6 @@ test io-50.5 {testing handler deletion vs reentrant calls} -constraints testchan
 } -body {
     set f [open $path(test1) w]
     close $f
-    set f [open $path(test1) r]
-    testchannelevent $f add readable [namespace code [list notcalled $f]]
-    testchannelevent $f add readable [namespace code [list del $f]]
     proc notcalled {f} {
 	variable z
 	lappend z "notcalled was called!! $f"
@@ -6845,6 +6844,10 @@ test io-50.5 {testing handler deletion vs reentrant calls} -constraints testchan
     set z ""
     set u toplevel
     update
+    set f [open $path(test1) r]
+    testchannelevent $f add readable [namespace code [list notcalled $f]]
+    testchannelevent $f add readable [namespace code [list del $f]]
+    update
     set z
 } -cleanup {
     close $f
@@ -6855,9 +6858,6 @@ test io-50.6 {testing handler deletion vs reentrant calls} -constraints testchan
 } -body {
     set f [open $path(test1) w]
     close $f
-    set f [open $path(test1) r]
-    testchannelevent $f add readable [namespace code [list second $f]]
-    testchannelevent $f add readable [namespace code [list first $f]]
     proc first {f} {
 	variable u
 	variable z
@@ -6887,6 +6887,10 @@ test io-50.6 {testing handler deletion vs reentrant calls} -constraints testchan
     }
     set z ""
     set u toplevel
+    update
+    set f [open $path(test1) r]
+    testchannelevent $f add readable [namespace code [list second $f]]
+    testchannelevent $f add readable [namespace code [list first $f]]
     update
     set z
 } -cleanup {
