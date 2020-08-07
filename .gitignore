@@ -14,8 +14,6 @@
 *.so
 .fslckout
 Makefile
-Tcl-Info.plist
-Tclsh-Info.plist
 autom4te.cache
 config.cache
 config.log
@@ -25,7 +23,6 @@ html
 manifest.uuid
 _FOSSIL_
 */tclConfig.sh
-*/tclsh*
 */versions.vc
 */version.vc
 */libtcl.vfs

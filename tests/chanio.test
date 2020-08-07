@@ -6411,11 +6411,8 @@ test chan-io-50.2 {testing handler deletion with multiple handlers} -setup {
 test chan-io-50.3 {testing handler deletion with multiple handlers} -setup {
     file delete $path(test1)
     chan close [open $path(test1) w]
-    set z ""
+    update
 } -constraints testchannelevent -body {
-    set f [open $path(test1) r]
-    testchannelevent $f add readable [namespace code [list notcalled $f 1]]
-    testchannelevent $f add readable [namespace code [list delhandler $f 0]]
     proc notcalled {f i} {
 	variable z
 	lappend z "notcalled was called!! $f $i"
@@ -6427,6 +6424,11 @@ test chan-io-50.3 {testing handler deletion with multiple handlers} -setup {
 	testchannelevent $f delete 0
 	lappend z "delhandler $f $i deleted myself"
     }
+    set z ""
+    update
+    set f [open $path(test1) r]
+    testchannelevent $f add readable [namespace code [list notcalled $f 1]]
+    testchannelevent $f add readable [namespace code [list delhandler $f 0]]
     update
     string equal $z \
 	[list [list delhandler $f 0 called] \
@@ -6462,9 +6464,6 @@ test chan-io-50.5 {testing handler deletion vs reentrant calls} -setup {
     set f [open $path(test1) w]
     chan close $f
 } -constraints testchannelevent -body {
-    set f [open $path(test1) r]
-    testchannelevent $f add readable [namespace code [list notcalled $f]]
-    testchannelevent $f add readable [namespace code [list del $f]]
     proc notcalled {f} {
 	variable z
 	lappend z "notcalled was called!! $f"
@@ -6486,6 +6485,12 @@ test chan-io-50.5 {testing handler deletion vs reentrant calls} -setup {
     }
     set z ""
     set u toplevel
+    # This test assumes that select will not detect the new open file
+    # until the update command runs.
+    update
+    set f [open $path(test1) r]
+    testchannelevent $f add readable [namespace code [list notcalled $f]]
+    testchannelevent $f add readable [namespace code [list del $f]]
     update
     set z
 } -cleanup {
@@ -6526,10 +6531,9 @@ test chan-io-50.6 {testing handler deletion vs reentrant calls} -setup {
     }
     set z ""
     set u toplevel
-    # This test assume that select will not detect the new open file
-    # until the update command runs.  This is not guaranteed, but it
-    # seems to help if we make sure that the calls to testchannelevent
-    # immediately follow the call to open.
+    # This test assumes that select will not detect the new open file
+    # until the update command runs.
+    update
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code [list second $f]]
     testchannelevent $f add readable [namespace code [list first $f]]
