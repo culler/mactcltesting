@@ -18,7 +18,7 @@ jobs:
         - BUILD_DIR=macosx
       install: []
       script: &mactest
-        - make -C macosx > /dev/null
+        - make -C macosx
         - make -C macosx test
     - name: "macOS/Xcode 11/Shared"
       os: osx
@@ -49,15 +49,12 @@ jobs:
       install: []
       script: *mactest
 before_install:
-  - echo running before_install
-  - ls generic
-  - echo before_install done
 install:
 #  - mkdir "$HOME/install dir"
 #  - ./configure ${CFGOPT} "--prefix=$HOME/install dir" || (cat config.log && exit 1)
 before_script:
   - export ERROR_ON_FAILURES=1
 script:
-#  - make
-#  - make test
-#  - make install
+  - make
+  - make test
+  - make install
