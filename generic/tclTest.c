@@ -307,7 +307,7 @@ static Tcl_FSNormalizePathProc TestReportNormalizePath;
 static Tcl_FSPathInFilesystemProc TestReportInFilesystem;
 static Tcl_FSFreeInternalRepProc TestReportFreeInternalRep;
 static Tcl_FSDupInternalRepProc TestReportDupInternalRep;
-
+static Tcl_CmdProc TestSetServiceModeCmd;
 static Tcl_FSStatProc SimpleStat;
 static Tcl_FSAccessProc SimpleAccess;
 static Tcl_FSOpenFileChannelProc SimpleOpenFileChannel;
@@ -561,10 +561,12 @@ Tcltest_Init(
 	    NULL, NULL);
     Tcl_CreateObjCommand(interp, "testsaveresult", TestsaveresultCmd,
 	    NULL, NULL);
+    Tcl_CreateCommand(interp, "testsetservicemode", TestSetServiceModeCmd,
+	    NULL, NULL);
     Tcl_CreateCommand(interp, "testsetassocdata", TestsetassocdataCmd,
-	    NULL, NULL);
+            NULL, NULL);
     Tcl_CreateCommand(interp, "testsetnoerr", TestsetCmd,
-	    NULL, NULL);
+            NULL, NULL);
     Tcl_CreateCommand(interp, "testseterr", TestsetCmd,
 	    (ClientData) TCL_LEAVE_ERR_MSG, NULL);
     Tcl_CreateCommand(interp, "testset2", Testset2Cmd,
@@ -5833,23 +5835,6 @@ TestChannelCmd(
     return TCL_ERROR;
 }
 
-/*
- *----------------------------------------------------------------------
- *
- * TestChannelEventCmd --
- *
- *	This procedure implements the "testchannelevent" command. It is used
- *	to test the Tcl channel event mechanism.
- *
- * Results:
- *	A standard Tcl result.
- *
- * Side effects:
- *	Creates, deletes and returns channel event handlers.
- *
- *----------------------------------------------------------------------
- */
-
 static int
 TestChannelEventCmd(
     ClientData dummy,		/* Not used. */
@@ -6046,6 +6031,50 @@ TestChannelEventCmd(
     return TCL_ERROR;
 }
 
+/*
+ *----------------------------------------------------------------------
+ *
+ * TestSetServiceModeCmd --
+ *
+ *	This procedure implements the "testservicemode" command. It calls
+ *      Tcl_SetServiceMode.  There are several io tests which open a file and
+ *      assign various handlers to it.  For these tests to be deterministic it
+ *      is important that file events not be processed until all of the
+ *      handlers are in place.
+ *
+ * Results:
+ *	A standard Tcl result.
+ *
+ * Side effects:
+ *	Creates, deletes and returns channel event handlers.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static int
+TestSetServiceModeCmd(
+    ClientData dummy,		/* Not used. */
+    Tcl_Interp *interp,		/* Current interpreter. */
+    int argc,			/* Number of arguments. */
+    const char **argv)		/* Argument strings. */
+{
+    int onoff;
+    if (argc != 2) {
+        Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
+                         " onoff\"", NULL);
+        return TCL_ERROR;
+    }
+    if (Tcl_GetInt(interp, argv[1], &onoff) == TCL_ERROR) {
+        return TCL_ERROR;
+    }
+        if (onoff == 0) {
+            Tcl_SetServiceMode(TCL_SERVICE_NONE);
+        } else {
+            Tcl_SetServiceMode(TCL_SERVICE_ALL);
+        }
+	return TCL_OK;
+}
+
 /*
  *----------------------------------------------------------------------
  *
