@@ -18,7 +18,7 @@ jobs:
         - BUILD_DIR=macosx
       install: []
       script: &mactest
-        - make -C macosx
+        - make -C macosx > /dev/null
         - make -C macosx test
     - name: "macOS/Xcode 11/Shared"
       os: osx
