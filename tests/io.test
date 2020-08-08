@@ -6832,8 +6832,8 @@ test io-50.5 {testing handler deletion vs reentrant calls} -constraints testchan
 	variable z
 	if {"$u" == "recursive"} {
 	    testchannelevent $f delete 1
-	    testchannelevent $f delete 0
 	    lappend z "del deleted notcalled"
+	    testchannelevent $f delete 0
 	    lappend z "del deleted myself"
 	} else {
 	    set u recursive
@@ -6844,7 +6844,6 @@ test io-50.5 {testing handler deletion vs reentrant calls} -constraints testchan
     }
     set z ""
     set u toplevel
-    update
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code [list notcalled $f]]
     testchannelevent $f add readable [namespace code [list del $f]]
