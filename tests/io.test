@@ -6881,7 +6881,7 @@ test io-50.6 {testing handler deletion vs reentrant calls} -constraints testchan
 	variable u
 	variable z
 	if {"$u" == "first"} {
-	    lappend z "second called, first time"<
+	    lappend z "second called, first time"
 	    set u second
 	    testchannelevent $f delete 0
 	} elseif {"$u" == "second"} {

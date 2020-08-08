@@ -6491,8 +6491,8 @@ test chan-io-50.5 {testing handler deletion vs reentrant calls} -setup {
     testsetservicemode 0
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code [list notcalled $f]]
-    testchannelevent $f add readable [namespace code [list del $f]]
     testsetservicemode 1
+    testchannelevent $f add readable [namespace code [list del $f]]
     update
     set z
 } -cleanup {
