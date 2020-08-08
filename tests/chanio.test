@@ -6399,11 +6399,11 @@ test chan-io-50.2 {testing handler deletion with multiple handlers} -setup {
 	lappend z "called delhandler $f $i"
 	testchannelevent $f delete 0
     }
-    testsetservicemode 0
+    testservicemode 0
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code [list delhandler $f 1]]
     testchannelevent $f add readable [namespace code [list delhandler $f 0]]
-    testsetservicemode 1
+    testservicemode 1
     update
     string equal $z \
 	[list [list called delhandler $f 0] [list called delhandler $f 1]]
@@ -6427,11 +6427,11 @@ test chan-io-50.3 {testing handler deletion with multiple handlers} -setup {
 	lappend z "delhandler $f $i deleted myself"
     }
     set z ""
-    testsetservicemode 0
+    testservicemode 0
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code [list notcalled $f 1]]
     testchannelevent $f add readable [namespace code [list delhandler $f 0]]
-    testsetservicemode 1
+    testservicemode 1
     update
     string equal $z \
 	[list [list delhandler $f 0 called] \
@@ -6488,10 +6488,10 @@ test chan-io-50.5 {testing handler deletion vs reentrant calls} -setup {
     }
     set z ""
     set u toplevel
-    testsetservicemode 0
+    testservicemode 0
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code [list notcalled $f]]
-    testsetservicemode 1
+    testservicemode 1
     testchannelevent $f add readable [namespace code [list del $f]]
     update
     set z
@@ -6510,7 +6510,10 @@ test chan-io-50.6 {testing handler deletion vs reentrant calls} -setup {
 	if {$u eq "toplevel"} {
 	    lappend z "first called"
 	    set u first
+	    set mode [testservicemode]
+	    testservicemode 1
 	    update
+	    testservicemode $mode
 	    lappend z "first after update"
 	} else {
 	    lappend z "first called not toplevel"
@@ -6533,11 +6536,11 @@ test chan-io-50.6 {testing handler deletion vs reentrant calls} -setup {
     }
     set z ""
     set u toplevel
-    testsetservicemode 0
+    testservicemode 0
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code [list second $f]]
     testchannelevent $f add readable [namespace code [list first $f]]
-    testsetservicemode 1
+    testservicemode 1
     update
     set z
 } -cleanup {

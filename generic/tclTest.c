@@ -307,7 +307,7 @@ static Tcl_FSNormalizePathProc TestReportNormalizePath;
 static Tcl_FSPathInFilesystemProc TestReportInFilesystem;
 static Tcl_FSFreeInternalRepProc TestReportFreeInternalRep;
 static Tcl_FSDupInternalRepProc TestReportDupInternalRep;
-static Tcl_CmdProc TestSetServiceModeCmd;
+static Tcl_CmdProc TestServiceModeCmd;
 static Tcl_FSStatProc SimpleStat;
 static Tcl_FSAccessProc SimpleAccess;
 static Tcl_FSOpenFileChannelProc SimpleOpenFileChannel;
@@ -561,7 +561,7 @@ Tcltest_Init(
 	    NULL, NULL);
     Tcl_CreateObjCommand(interp, "testsaveresult", TestsaveresultCmd,
 	    NULL, NULL);
-    Tcl_CreateCommand(interp, "testsetservicemode", TestSetServiceModeCmd,
+    Tcl_CreateCommand(interp, "testservicemode", TestServiceModeCmd,
 	    NULL, NULL);
     Tcl_CreateCommand(interp, "testsetassocdata", TestsetassocdataCmd,
             NULL, NULL);
@@ -6034,45 +6034,49 @@ TestChannelEventCmd(
 /*
  *----------------------------------------------------------------------
  *
- * TestSetServiceModeCmd --
+ * TestServiceModeCmd --
  *
- *	This procedure implements the "testservicemode" command. It calls
- *      Tcl_SetServiceMode.  There are several io tests which open a file and
- *      assign various handlers to it.  For these tests to be deterministic it
- *      is important that file events not be processed until all of the
- *      handlers are in place.
+ *	This procedure implements the "testservicemode" command which gets or
+ *      sets the current Tcl ServiceMode.  There are several tests which open
+ *      a file and assign various handlers to it.  For these tests to be
+ *      deterministic it is important that file events not be processed until
+ *      all of the handlers are in place.
  *
  * Results:
  *	A standard Tcl result.
  *
  * Side effects:
- *	Creates, deletes and returns channel event handlers.
+ *	May change the ServiceMode setting.
  *
  *----------------------------------------------------------------------
  */
 
 static int
-TestSetServiceModeCmd(
+TestServiceModeCmd(
     ClientData dummy,		/* Not used. */
     Tcl_Interp *interp,		/* Current interpreter. */
     int argc,			/* Number of arguments. */
     const char **argv)		/* Argument strings. */
 {
-    int onoff;
-    if (argc != 2) {
+    int newmode, oldmode;
+    if (argc > 2) {
         Tcl_AppendResult(interp, "wrong # args: should be \"", argv[0],
-                         " onoff\"", NULL);
+                         " ?newmode?\"", NULL);
         return TCL_ERROR;
     }
-    if (Tcl_GetInt(interp, argv[1], &onoff) == TCL_ERROR) {
-        return TCL_ERROR;
-    }
-        if (onoff == 0) {
+    oldmode = (Tcl_GetServiceMode() != TCL_SERVICE_NONE);
+    if (argc == 2) {
+        if (Tcl_GetInt(interp, argv[1], &newmode) == TCL_ERROR) {
+            return TCL_ERROR;
+        }
+        if (newmode == 0) {
             Tcl_SetServiceMode(TCL_SERVICE_NONE);
         } else {
             Tcl_SetServiceMode(TCL_SERVICE_ALL);
         }
-	return TCL_OK;
+    }
+    Tcl_SetObjResult(interp, Tcl_NewIntObj(oldmode));
+    return TCL_OK;
 }
 
 /*

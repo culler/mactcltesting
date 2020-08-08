@@ -6734,10 +6734,10 @@ test io-50.1 {testing handler deletion} -constraints testchannelevent -setup {
 	set z called
 	testchannelevent $f delete 0
     }
-    testsetservicemode 0
+    testservicemode 0
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code [list delhandler $f]]
-    testsetservicemode 1 
+    testservicemode 1 
     update
     set z
 } -cleanup {
@@ -6754,11 +6754,11 @@ test io-50.2 {testing handler deletion with multiple handlers} -constraints test
 	testchannelevent $f delete 0
     }
     set z ""
-    testsetservicemode 0
+    testservicemode 0
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code [list delhandler $f 1]]
     testchannelevent $f add readable [namespace code [list delhandler $f 0]]
-    testsetservicemode 1
+    testservicemode 1
     update
     string compare [string tolower $z] \
 	[list [list called delhandler $f 0] [list called delhandler $f 1]]
@@ -6783,11 +6783,11 @@ test io-50.3 {testing handler deletion with multiple handlers} -constraints test
 	lappend z "delhandler $f $i deleted myself"
     }
     set z ""
-    testsetservicemode 0
+    testservicemode 0
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code [list notcalled $f 1]]
     testchannelevent $f add readable [namespace code [list delhandler $f 0]]
-    testsetservicemode 1
+    testservicemode 1
     update
     string compare [string tolower $z] \
 	[list [list delhandler $f 0 called] \
@@ -6814,10 +6814,10 @@ test io-50.4 {testing handler deletion vs reentrant calls} -constraints testchan
     }
     variable u toplevel
     variable z ""
-    testsetservicemode 0
+    testservicemode 0
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code [list delrecursive $f]]
-    testsetservicemode 1
+    testservicemode 1
     update
     set z
 } -cleanup {
@@ -6849,11 +6849,11 @@ test io-50.5 {testing handler deletion vs reentrant calls} -constraints testchan
     }
     set z ""
     set u toplevel
-    testsetservicemode 0
+    testservicemode 0
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code [list notcalled $f]]
     testchannelevent $f add readable [namespace code [list del $f]]
-    testsetservicemode 1
+    testservicemode 1
     update
     set z
 } -cleanup {
@@ -6894,11 +6894,11 @@ test io-50.6 {testing handler deletion vs reentrant calls} -constraints testchan
     }
     set z ""
     set u toplevel
-    testsetservicemode 0
+    testservicemode 0
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code [list second $f]]
     testchannelevent $f add readable [namespace code [list first $f]]
-    testsetservicemode 1
+    testservicemode 1
     update
     set z
 } -cleanup {
