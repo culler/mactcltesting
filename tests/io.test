@@ -6746,15 +6746,16 @@ test io-50.2 {testing handler deletion with multiple handlers} -constraints test
 } -body {
     set f [open $path(test1) w]
     close $f
-    set f [open $path(test1) r]
-    testchannelevent $f add readable [namespace code [list delhandler $f 1]]
-    testchannelevent $f add readable [namespace code [list delhandler $f 0]]
     proc delhandler {f i} {
 	variable z
 	lappend z "called delhandler $f $i"
 	testchannelevent $f delete 0
     }
     set z ""
+    update
+    set f [open $path(test1) r]
+    testchannelevent $f add readable [namespace code [list delhandler $f 1]]
+    testchannelevent $f add readable [namespace code [list delhandler $f 0]]
     update
     string compare [string tolower $z] \
 	[list [list called delhandler $f 0] [list called delhandler $f 1]]
