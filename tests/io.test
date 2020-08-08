@@ -6737,7 +6737,7 @@ test io-50.1 {testing handler deletion} -constraints testchannelevent -setup {
     testsetservicemode 0
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code [list delhandler $f]]
-    testsetservicemode 
+    testsetservicemode 1 
     update
     set z
 } -cleanup {
