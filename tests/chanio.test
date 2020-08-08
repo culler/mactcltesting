@@ -6443,6 +6443,7 @@ test chan-io-50.4 {testing handler deletion vs reentrant calls} -setup {
     file delete $path(test1)
     set f [open $path(test1) w]
     chan close $f
+    update
 } -constraints testchannelevent -body {
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code {
@@ -6461,11 +6462,13 @@ test chan-io-50.4 {testing handler deletion vs reentrant calls} -setup {
     set z
 } -cleanup {
     chan close $f
+    update
 } -result {{delrecursive calling recursive} {delrecursive deleting recursive}}
 test chan-io-50.5 {testing handler deletion vs reentrant calls} -setup {
     file delete $path(test1)
     set f [open $path(test1) w]
     chan close $f
+    update
 } -constraints testchannelevent -body {
     proc notcalled {f} {
 	variable z
@@ -6482,7 +6485,9 @@ test chan-io-50.5 {testing handler deletion vs reentrant calls} -setup {
 	} else {
 	    set u recursive
 	    lappend z "del calling recursive"
+	    set mode [test servicemode 1]
 	    update
+	    test servicemode $mode
 	    lappend z "del after update"
 	}
     }
@@ -6497,12 +6502,14 @@ test chan-io-50.5 {testing handler deletion vs reentrant calls} -setup {
     set z
 } -cleanup {
     chan close $f
+    update
 } -result [list {del calling recursive} {del deleted notcalled} \
 	       {del deleted myself} {del after update}]
 test chan-io-50.6 {testing handler deletion vs reentrant calls} -setup {
     file delete $path(test1)
     set f [open $path(test1) w]
     chan close $f
+    update
 } -constraints testchannelevent -body {
     proc first {f} {
 	variable u
@@ -6510,8 +6517,7 @@ test chan-io-50.6 {testing handler deletion vs reentrant calls} -setup {
 	if {$u eq "toplevel"} {
 	    lappend z "first called"
 	    set u first
-	    set mode [testservicemode]
-	    testservicemode 1
+	    set mode [testservicemode 1]
 	    update
 	    testservicemode $mode
 	    lappend z "first after update"
