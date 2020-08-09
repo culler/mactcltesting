@@ -564,9 +564,9 @@ Tcltest_Init(
     Tcl_CreateCommand(interp, "testservicemode", TestServiceModeCmd,
 	    NULL, NULL);
     Tcl_CreateCommand(interp, "testsetassocdata", TestsetassocdataCmd,
-            NULL, NULL);
+	    NULL, NULL);
     Tcl_CreateCommand(interp, "testsetnoerr", TestsetCmd,
-            NULL, NULL);
+	    NULL, NULL);
     Tcl_CreateCommand(interp, "testseterr", TestsetCmd,
 	    (ClientData) TCL_LEAVE_ERR_MSG, NULL);
     Tcl_CreateCommand(interp, "testset2", Testset2Cmd,
@@ -5835,6 +5835,23 @@ TestChannelCmd(
     return TCL_ERROR;
 }
 
+/*
+ *----------------------------------------------------------------------
+ *
+ * TestChannelEventCmd --
+ *
+ *	This procedure implements the "testchannelevent" command. It is used
+ *	to test the Tcl channel event mechanism.
+ *
+ * Results:
+ *	A standard Tcl result.
+ *
+ * Side effects:
+ *	Creates, deletes and returns channel event handlers.
+ *
+ *----------------------------------------------------------------------
+ */
+
 static int
 TestChannelEventCmd(
     ClientData dummy,		/* Not used. */
