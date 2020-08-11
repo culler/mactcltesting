@@ -1,13 +1,5 @@
+sudo: false
 language: c
-cache:
-  directories:
-    - $HOME/Library/Caches/Homebrew
-    - /usr/local/Homebrew
-addons:
-  homebrew:
-    packages:
-      - libtommath
-    update: false
 jobs:
   include:
 # Testing on Mac, various styles
@@ -18,8 +10,15 @@ jobs:
         - BUILD_DIR=macosx
       install: []
       script: &mactest
-        - make -C macosx
-        - make -C macosx test
+        - make all
+        # The styles=develop avoids some weird problems on OSX
+        - make test styles=develop
+    - name: "macOS/Xcode 11.5/Shared/Unix-like"
+      os: osx
+      osx_image: xcode11.5
+      env:
+        - BUILD_DIR=unix
+# Older MacOS versions
     - name: "macOS/Xcode 11/Shared"
       os: osx
       osx_image: xcode11
@@ -49,12 +48,13 @@ jobs:
       install: []
       script: *mactest
 before_install:
+  - cd ${BUILD_DIR}
 install:
-#  - mkdir "$HOME/install dir"
-#  - ./configure ${CFGOPT} "--prefix=$HOME/install dir" || (cat config.log && exit 1)
+  - mkdir "$HOME/install dir"
+  - ./configure ${CFGOPT} "--prefix=$HOME/install dir" || (cat config.log && exit 1)
 before_script:
   - export ERROR_ON_FAILURES=1
 script:
-  - make
+  - make all tcltest
   - make test
   - make install
