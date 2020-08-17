@@ -15,7 +15,6 @@
 #ifdef _WIN32
 #   include "tclWinInt.h"
 #endif
-#include <locale.h>
 
 /*
  * The state structure used by [foreach]. Note that the actual structure has
@@ -46,24 +45,11 @@ struct ForeachState {
 
 static int		CheckAccess(Tcl_Interp *interp, Tcl_Obj *pathPtr,
 			    int mode);
-static int		BadEncodingSubcommand(ClientData dummy,
-			    Tcl_Interp *interp, int objc,
-			    Tcl_Obj *const objv[]);
-static int		EncodingConvertfromObjCmd(ClientData dummy,
-			    Tcl_Interp *interp, int objc,
-			    Tcl_Obj *const objv[]);
-static int		EncodingConverttoObjCmd(ClientData dummy,
-			    Tcl_Interp *interp, int objc,
-			    Tcl_Obj *const objv[]);
-static int		EncodingDirsObjCmd(ClientData dummy,
-			    Tcl_Interp *interp, int objc,
-			    Tcl_Obj *const objv[]);
-static int		EncodingNamesObjCmd(ClientData dummy,
-			    Tcl_Interp *interp, int objc,
-			    Tcl_Obj *const objv[]);
-static int		EncodingSystemObjCmd(ClientData dummy,
-			    Tcl_Interp *interp, int objc,
-			    Tcl_Obj *const objv[]);
+static Tcl_ObjCmdProc	EncodingConvertfromObjCmd;
+static Tcl_ObjCmdProc	EncodingConverttoObjCmd;
+static Tcl_ObjCmdProc	EncodingDirsObjCmd;
+static Tcl_ObjCmdProc	EncodingNamesObjCmd;
+static Tcl_ObjCmdProc	EncodingSystemObjCmd;
 static inline int	ForeachAssignments(Tcl_Interp *interp,
 			    struct ForeachState *statePtr);
 static inline void	ForeachCleanup(Tcl_Interp *interp,
@@ -84,7 +70,6 @@ static Tcl_NRPostProc	ForPostNextCallback;
 static Tcl_NRPostProc	ForeachLoopStep;
 static Tcl_NRPostProc	EvalCmdErrMsg;
 
-static Tcl_ObjCmdProc	BadFileSubcommand;
 static Tcl_ObjCmdProc FileAttrAccessTimeCmd;
 static Tcl_ObjCmdProc FileAttrIsDirectoryCmd;
 static Tcl_ObjCmdProc FileAttrIsExecutableCmd;
@@ -132,10 +117,9 @@ static Tcl_ObjCmdProc PathTypeCmd;
  *----------------------------------------------------------------------
  */
 
-	/* ARGSUSED */
 int
 Tcl_BreakObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
@@ -164,16 +148,15 @@ Tcl_BreakObjCmd(
  *
  *----------------------------------------------------------------------
  */
-
-	/* ARGSUSED */
+#if !defined(TCL_NO_DEPRECATED) && TCL_MAJOR_VERSION < 9
 int
 Tcl_CaseObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
-    register int i;
+    int i;
     int body, result, caseObjc;
     const char *stringPtr, *arg;
     Tcl_Obj *const *caseObjv;
@@ -282,6 +265,7 @@ Tcl_CaseObjCmd(
 
     return TCL_OK;
 }
+#endif /* !TCL_NO_DEPRECATED */
 
 /*
  *----------------------------------------------------------------------
@@ -300,20 +284,19 @@ Tcl_CaseObjCmd(
  *----------------------------------------------------------------------
  */
 
-	/* ARGSUSED */
 int
 Tcl_CatchObjCmd(
-    ClientData dummy,		/* Not used. */
+    ClientData clientData,
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
-    return Tcl_NRCallObjProc(interp, TclNRCatchObjCmd, dummy, objc, objv);
+    return Tcl_NRCallObjProc(interp, TclNRCatchObjCmd, clientData, objc, objv);
 }
 
 int
 TclNRCatchObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
@@ -353,8 +336,8 @@ CatchObjCmdCallback(
 {
     Interp *iPtr = (Interp *) interp;
     int objc = PTR2INT(data[0]);
-    Tcl_Obj *varNamePtr = data[1];
-    Tcl_Obj *optionVarNamePtr = data[2];
+    Tcl_Obj *varNamePtr = (Tcl_Obj *)data[1];
+    Tcl_Obj *optionVarNamePtr = (Tcl_Obj *)data[2];
     int rewind = iPtr->execEnvPtr->rewind;
 
     /*
@@ -385,7 +368,7 @@ CatchObjCmdCallback(
     }
 
     Tcl_ResetResult(interp);
-    Tcl_SetObjResult(interp, Tcl_NewIntObj(result));
+    Tcl_SetObjResult(interp, Tcl_NewWideIntObj(result));
     return TCL_OK;
 }
 
@@ -406,10 +389,9 @@ CatchObjCmdCallback(
  *----------------------------------------------------------------------
  */
 
-	/* ARGSUSED */
 int
 Tcl_CdObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
@@ -462,10 +444,9 @@ Tcl_CdObjCmd(
  *----------------------------------------------------------------------
  */
 
-	/* ARGSUSED */
 int
 Tcl_ConcatObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
@@ -497,10 +478,9 @@ Tcl_ConcatObjCmd(
  *----------------------------------------------------------------------
  */
 
-	/* ARGSUSED */
 int
 Tcl_ContinueObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
@@ -535,120 +515,13 @@ TclInitEncodingCmd(
     static const EnsembleImplMap encodingImplMap[] = {
 	{"convertfrom", EncodingConvertfromObjCmd, TclCompileBasic1Or2ArgCmd, NULL, NULL, 0},
 	{"convertto",   EncodingConverttoObjCmd,   TclCompileBasic1Or2ArgCmd, NULL, NULL, 0},
-	{"dirs",        EncodingDirsObjCmd,        TclCompileBasic0Or1ArgCmd, NULL, NULL, 0},
+	{"dirs",        EncodingDirsObjCmd,        TclCompileBasic0Or1ArgCmd, NULL, NULL, 1},
 	{"names",       EncodingNamesObjCmd,       TclCompileBasic0ArgCmd,    NULL, NULL, 0},
-	{"system",      EncodingSystemObjCmd,      TclCompileBasic0Or1ArgCmd, NULL, NULL, 0},
+	{"system",      EncodingSystemObjCmd,      TclCompileBasic0Or1ArgCmd, NULL, NULL, 1},
 	{NULL,          NULL,                      NULL,                      NULL, NULL, 0}
     };
 
     return TclMakeEnsemble(interp, "encoding", encodingImplMap);
-}
-
-/*
- *-----------------------------------------------------------------------------
- *
- * TclMakeEncodingCommandSafe --
- *
- *	This function hides the unsafe 'dirs' and 'system' subcommands of
- *	the "encoding" Tcl command ensemble. It must be called only from
- *	TclHideUnsafeCommands.
- *
- * Results:
- *	A standard Tcl result
- *
- * Side effects:
- *	Adds commands to the table of hidden commands.
- *
- *-----------------------------------------------------------------------------
- */
-
-int
-TclMakeEncodingCommandSafe(
-    Tcl_Interp* interp)		/* Tcl interpreter */
-{
-    static const struct {
-	const char *cmdName;
-	int unsafe;
-    } unsafeInfo[] = {
-	{"convertfrom", 0},
-	{"convertto",   0},
-	{"dirs",        1},
-	{"names",       0},
-	{"system",      0},
-	{NULL,          0}
-    };
-
-    int i;
-    Tcl_DString oldBuf, newBuf;
-
-    Tcl_DStringInit(&oldBuf);
-    TclDStringAppendLiteral(&oldBuf, "::tcl::encoding::");
-    Tcl_DStringInit(&newBuf);
-    TclDStringAppendLiteral(&newBuf, "tcl:encoding:");
-    for (i=0 ; unsafeInfo[i].cmdName != NULL ; i++) {
-	if (unsafeInfo[i].unsafe) {
-	    const char *oldName, *newName;
-
-	    Tcl_DStringSetLength(&oldBuf, 17);
-	    oldName = Tcl_DStringAppend(&oldBuf, unsafeInfo[i].cmdName, -1);
-	    Tcl_DStringSetLength(&newBuf, 13);
-	    newName = Tcl_DStringAppend(&newBuf, unsafeInfo[i].cmdName, -1);
-	    if (TclRenameCommand(interp, oldName, "___tmp") != TCL_OK
-		    || Tcl_HideCommand(interp, "___tmp", newName) != TCL_OK) {
-		Tcl_Panic("problem making 'encoding %s' safe: %s",
-			unsafeInfo[i].cmdName,
-			Tcl_GetString(Tcl_GetObjResult(interp)));
-	    }
-	    Tcl_CreateObjCommand(interp, oldName, BadEncodingSubcommand,
-		    (ClientData) unsafeInfo[i].cmdName, NULL);
-	}
-    }
-    Tcl_DStringFree(&oldBuf);
-    Tcl_DStringFree(&newBuf);
-
-    /*
-     * Ugh. The [encoding] command is now actually safe, but it is assumed by
-     * scripts that it is not, which messes up security policies.
-     */
-
-    if (Tcl_HideCommand(interp, "encoding", "encoding") != TCL_OK) {
-	Tcl_Panic("problem making 'encoding' safe: %s",
-		Tcl_GetString(Tcl_GetObjResult(interp)));
-    }
-    return TCL_OK;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * BadEncodingSubcommand --
- *
- *	Command used to act as a backstop implementation when subcommands of
- *	"encoding" are unsafe (the real implementations of the subcommands are
- *	hidden). The clientData is always the full official subcommand name.
- *
- * Results:
- *	A standard Tcl result (always a TCL_ERROR).
- *
- * Side effects:
- *	None.
- *
- *----------------------------------------------------------------------
- */
-
-static int
-BadEncodingSubcommand(
-    ClientData clientData,
-    Tcl_Interp *interp,
-    int objc,
-    Tcl_Obj *const objv[])
-{
-    const char *subcommandName = (const char *) clientData;
-
-    Tcl_SetObjResult(interp, Tcl_ObjPrintf(
-	    "not allowed to invoke subcommand %s of encoding", subcommandName));
-    Tcl_SetErrorCode(interp, "TCL", "SAFE", "SUBCOMMAND", NULL);
-    return TCL_ERROR;
 }
 
 /*
@@ -667,7 +540,7 @@ BadEncodingSubcommand(
 
 int
 EncodingConvertfromObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
@@ -729,7 +602,7 @@ EncodingConvertfromObjCmd(
 
 int
 EncodingConverttoObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
@@ -793,7 +666,7 @@ EncodingConverttoObjCmd(
 
 int
 EncodingDirsObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
@@ -836,10 +709,11 @@ EncodingDirsObjCmd(
  */
 
 int
-EncodingNamesObjCmd(ClientData dummy,       /* Unused */
-		    Tcl_Interp* interp,	    /* Tcl interpreter */
-		    int objc,		    /* Number of command line args */
-		    Tcl_Obj* const objv[])  /* Vector of command line args */
+EncodingNamesObjCmd(
+    TCL_UNUSED(ClientData),
+    Tcl_Interp* interp,	    /* Tcl interpreter */
+    int objc,		    /* Number of command line args */
+    Tcl_Obj* const objv[])  /* Vector of command line args */
 {
     if (objc > 1) {
 	Tcl_WrongNumArgs(interp, 1, objv, NULL);
@@ -866,10 +740,11 @@ EncodingNamesObjCmd(ClientData dummy,       /* Unused */
  */
 
 int
-EncodingSystemObjCmd(ClientData dummy,      /* Unused */
-		     Tcl_Interp* interp,    /* Tcl interpreter */
-		     int objc,		    /* Number of command line args */
-		     Tcl_Obj* const objv[]) /* Vector of command line args */
+EncodingSystemObjCmd(
+    TCL_UNUSED(ClientData),
+    Tcl_Interp* interp,     /* Tcl interpreter */
+    int objc,		    /* Number of command line args */
+    Tcl_Obj* const objv[])  /* Vector of command line args */
 {
     if (objc > 2) {
 	Tcl_WrongNumArgs(interp, 1, objv, "?encoding?");
@@ -901,10 +776,9 @@ EncodingSystemObjCmd(ClientData dummy,      /* Unused */
  *----------------------------------------------------------------------
  */
 
-	/* ARGSUSED */
 int
 Tcl_ErrorObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
@@ -951,10 +825,9 @@ Tcl_ErrorObjCmd(
  *----------------------------------------------------------------------
  */
 
-	/* ARGSUSED */
 static int
 EvalCmdErrMsg(
-    ClientData data[],
+    TCL_UNUSED(ClientData *),
     Tcl_Interp *interp,
     int result)
 {
@@ -967,22 +840,22 @@ EvalCmdErrMsg(
 
 int
 Tcl_EvalObjCmd(
-    ClientData dummy,		/* Not used. */
+    ClientData clientData,
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
-    return Tcl_NRCallObjProc(interp, TclNREvalObjCmd, dummy, objc, objv);
+    return Tcl_NRCallObjProc(interp, TclNREvalObjCmd, clientData, objc, objv);
 }
 
 int
 TclNREvalObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
-    register Tcl_Obj *objPtr;
+    Tcl_Obj *objPtr;
     Interp *iPtr = (Interp *) interp;
     CmdFrame *invoker = NULL;
     int word = 0;
@@ -1034,15 +907,14 @@ TclNREvalObjCmd(
  *----------------------------------------------------------------------
  */
 
-	/* ARGSUSED */
 int
 Tcl_ExitObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
-    int value;
+    Tcl_WideInt value;
 
     if ((objc != 1) && (objc != 2)) {
 	Tcl_WrongNumArgs(interp, 1, objv, "?returnCode?");
@@ -1051,11 +923,10 @@ Tcl_ExitObjCmd(
 
     if (objc == 1) {
 	value = 0;
-    } else if (Tcl_GetIntFromObj(interp, objv[1], &value) != TCL_OK) {
+    } else if (TclGetWideBitsFromObj(interp, objv[1], &value) != TCL_OK) {
 	return TCL_ERROR;
     }
-    Tcl_Exit(value);
-    /*NOTREACHED*/
+    Tcl_Exit((int)value);
     return TCL_OK;		/* Better not ever reach this! */
 }
 
@@ -1083,20 +954,19 @@ Tcl_ExitObjCmd(
  *----------------------------------------------------------------------
  */
 
-	/* ARGSUSED */
 int
 Tcl_ExprObjCmd(
-    ClientData dummy,		/* Not used. */
+    ClientData clientData,
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
-    return Tcl_NRCallObjProc(interp, TclNRExprObjCmd, dummy, objc, objv);
+    return Tcl_NRCallObjProc(interp, TclNRExprObjCmd, clientData, objc, objv);
 }
 
 int
 TclNRExprObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
@@ -1127,8 +997,8 @@ ExprCallback(
     Tcl_Interp *interp,
     int result)
 {
-    Tcl_Obj *resultPtr = data[0];
-    Tcl_Obj *objPtr = data[1];
+    Tcl_Obj *resultPtr = (Tcl_Obj *)data[0];
+    Tcl_Obj *objPtr = (Tcl_Obj *)data[1];
 
     if (objPtr != NULL) {
 	Tcl_DecrRefCount(objPtr);
@@ -1173,178 +1043,44 @@ TclInitFileCmd(
      */
 
     static const EnsembleImplMap initMap[] = {
-	{"atime",	FileAttrAccessTimeCmd,	TclCompileBasic1Or2ArgCmd, NULL, NULL, 0},
-	{"attributes",	TclFileAttrsCmd,	NULL, NULL, NULL, 0},
+	{"atime",	FileAttrAccessTimeCmd,	TclCompileBasic1Or2ArgCmd, NULL, NULL, 1},
+	{"attributes",	TclFileAttrsCmd,	NULL, NULL, NULL, 1},
 	{"channels",	TclChannelNamesCmd,	TclCompileBasic0Or1ArgCmd, NULL, NULL, 0},
-	{"copy",	TclFileCopyCmd,		NULL, NULL, NULL, 0},
-	{"delete",	TclFileDeleteCmd,	TclCompileBasicMin0ArgCmd, NULL, NULL, 0},
-	{"dirname",	PathDirNameCmd,		TclCompileBasic1ArgCmd, NULL, NULL, 0},
-	{"executable",	FileAttrIsExecutableCmd, TclCompileBasic1ArgCmd, NULL, NULL, 0},
-	{"exists",	FileAttrIsExistingCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 0},
-	{"extension",	PathExtensionCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 0},
-	{"isdirectory",	FileAttrIsDirectoryCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 0},
-	{"isfile",	FileAttrIsFileCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 0},
+	{"copy",	TclFileCopyCmd,		NULL, NULL, NULL, 1},
+	{"delete",	TclFileDeleteCmd,	TclCompileBasicMin0ArgCmd, NULL, NULL, 1},
+	{"dirname",	PathDirNameCmd,		TclCompileBasic1ArgCmd, NULL, NULL, 1},
+	{"executable",	FileAttrIsExecutableCmd, TclCompileBasic1ArgCmd, NULL, NULL, 1},
+	{"exists",	FileAttrIsExistingCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 1},
+	{"extension",	PathExtensionCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 1},
+	{"isdirectory",	FileAttrIsDirectoryCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 1},
+	{"isfile",	FileAttrIsFileCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 1},
 	{"join",	PathJoinCmd,		TclCompileBasicMin1ArgCmd, NULL, NULL, 0},
-	{"link",	TclFileLinkCmd,		TclCompileBasic1To3ArgCmd, NULL, NULL, 0},
-	{"lstat",	FileAttrLinkStatCmd,	TclCompileBasic2ArgCmd, NULL, NULL, 0},
-	{"mtime",	FileAttrModifyTimeCmd,	TclCompileBasic1Or2ArgCmd, NULL, NULL, 0},
-	{"mkdir",	TclFileMakeDirsCmd,	TclCompileBasicMin0ArgCmd, NULL, NULL, 0},
-	{"nativename",	PathNativeNameCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 0},
-	{"normalize",	PathNormalizeCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 0},
-	{"owned",	FileAttrIsOwnedCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 0},
+	{"link",	TclFileLinkCmd,		TclCompileBasic1To3ArgCmd, NULL, NULL, 1},
+	{"lstat",	FileAttrLinkStatCmd,	TclCompileBasic2ArgCmd, NULL, NULL, 1},
+	{"mtime",	FileAttrModifyTimeCmd,	TclCompileBasic1Or2ArgCmd, NULL, NULL, 1},
+	{"mkdir",	TclFileMakeDirsCmd,	TclCompileBasicMin0ArgCmd, NULL, NULL, 1},
+	{"nativename",	PathNativeNameCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 1},
+	{"normalize",	PathNormalizeCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 1},
+	{"owned",	FileAttrIsOwnedCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 1},
 	{"pathtype",	PathTypeCmd,		TclCompileBasic1ArgCmd, NULL, NULL, 0},
-	{"readable",	FileAttrIsReadableCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 0},
-	{"readlink",	TclFileReadLinkCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 0},
-	{"rename",	TclFileRenameCmd,	NULL, NULL, NULL, 0},
-	{"rootname",	PathRootNameCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 0},
+	{"readable",	FileAttrIsReadableCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 1},
+	{"readlink",	TclFileReadLinkCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 1},
+	{"rename",	TclFileRenameCmd,	NULL, NULL, NULL, 1},
+	{"rootname",	PathRootNameCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 1},
 	{"separator",	FilesystemSeparatorCmd,	TclCompileBasic0Or1ArgCmd, NULL, NULL, 0},
-	{"size",	FileAttrSizeCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 0},
+	{"size",	FileAttrSizeCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 1},
 	{"split",	PathSplitCmd,		TclCompileBasic1ArgCmd, NULL, NULL, 0},
-	{"stat",	FileAttrStatCmd,	TclCompileBasic2ArgCmd, NULL, NULL, 0},
+	{"stat",	FileAttrStatCmd,	TclCompileBasic2ArgCmd, NULL, NULL, 1},
 	{"system",	PathFilesystemCmd,	TclCompileBasic0Or1ArgCmd, NULL, NULL, 0},
-	{"tail",	PathTailCmd,		TclCompileBasic1ArgCmd, NULL, NULL, 0},
-	{"tempfile",	TclFileTemporaryCmd,	TclCompileBasic0To2ArgCmd, NULL, NULL, 0},
-	{"type",	FileAttrTypeCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 0},
-	{"volumes",	FilesystemVolumesCmd,	TclCompileBasic0ArgCmd, NULL, NULL, 0},
-	{"writable",	FileAttrIsWritableCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 0},
+	{"tail",	PathTailCmd,		TclCompileBasic1ArgCmd, NULL, NULL, 1},
+	{"tempdir",	TclFileTempDirCmd,	TclCompileBasic0Or1ArgCmd, NULL, NULL, 1},
+	{"tempfile",	TclFileTemporaryCmd,	TclCompileBasic0To2ArgCmd, NULL, NULL, 1},
+	{"type",	FileAttrTypeCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 1},
+	{"volumes",	FilesystemVolumesCmd,	TclCompileBasic0ArgCmd, NULL, NULL, 1},
+	{"writable",	FileAttrIsWritableCmd,	TclCompileBasic1ArgCmd, NULL, NULL, 1},
 	{NULL, NULL, NULL, NULL, NULL, 0}
     };
     return TclMakeEnsemble(interp, "file", initMap);
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * TclMakeFileCommandSafe --
- *
- *	This function hides the unsafe subcommands of the "file" Tcl command
- *	ensemble. It must only be called from TclHideUnsafeCommands.
- *
- * Results:
- *	A standard Tcl result.
- *
- * Side effects:
- *	Adds commands to the table of hidden commands.
- *
- *----------------------------------------------------------------------
- */
-
-int
-TclMakeFileCommandSafe(
-    Tcl_Interp *interp)
-{
-    static const struct {
-	const char *cmdName;
-	int unsafe;
-    } unsafeInfo[] = {
-	{"atime",	 1},
-	{"attributes",	 1},
-	{"channels",	 0},
-	{"copy",	 1},
-	{"delete",	 1},
-	{"dirname",	 1},
-	{"executable",	 1},
-	{"exists",	 1},
-	{"extension",	 1},
-	{"isdirectory",	 1},
-	{"isfile",	 1},
-	{"join",	 0},
-	{"link",	 1},
-	{"lstat",	 1},
-	{"mtime",	 1},
-	{"mkdir",	 1},
-	{"nativename",	 1},
-	{"normalize",	 1},
-	{"owned",	 1},
-	{"pathtype",	 0},
-	{"readable",	 1},
-	{"readlink",	 1},
-	{"rename",	 1},
-	{"rootname",	 1},
-	{"separator",	 0},
-	{"size",	 1},
-	{"split",	 0},
-	{"stat",	 1},
-	{"system",	 0},
-	{"tail",	 1},
-	{"tempfile",	 1},
-	{"type",	 1},
-	{"volumes",	 1},
-	{"writable",	 1},
-	{NULL, 0}
-    };
-    int i;
-    Tcl_DString oldBuf, newBuf;
-
-    Tcl_DStringInit(&oldBuf);
-    TclDStringAppendLiteral(&oldBuf, "::tcl::file::");
-    Tcl_DStringInit(&newBuf);
-    TclDStringAppendLiteral(&newBuf, "tcl:file:");
-    for (i=0 ; unsafeInfo[i].cmdName != NULL ; i++) {
-	if (unsafeInfo[i].unsafe) {
-	    const char *oldName, *newName;
-
-	    Tcl_DStringSetLength(&oldBuf, 13);
-	    oldName = Tcl_DStringAppend(&oldBuf, unsafeInfo[i].cmdName, -1);
-	    Tcl_DStringSetLength(&newBuf, 9);
-	    newName = Tcl_DStringAppend(&newBuf, unsafeInfo[i].cmdName, -1);
-	    if (TclRenameCommand(interp, oldName, "___tmp") != TCL_OK
-		    || Tcl_HideCommand(interp, "___tmp", newName) != TCL_OK) {
-		Tcl_Panic("problem making 'file %s' safe: %s",
-			unsafeInfo[i].cmdName,
-			Tcl_GetString(Tcl_GetObjResult(interp)));
-	    }
-	    Tcl_CreateObjCommand(interp, oldName, BadFileSubcommand,
-		    (ClientData) unsafeInfo[i].cmdName, NULL);
-	}
-    }
-    Tcl_DStringFree(&oldBuf);
-    Tcl_DStringFree(&newBuf);
-
-    /*
-     * Ugh. The [file] command is now actually safe, but it is assumed by
-     * scripts that it is not, which messes up security policies. [Bug
-     * 3211758]
-     */
-
-    if (Tcl_HideCommand(interp, "file", "file") != TCL_OK) {
-	Tcl_Panic("problem making 'file' safe: %s",
-		Tcl_GetString(Tcl_GetObjResult(interp)));
-    }
-    return TCL_OK;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * BadFileSubcommand --
- *
- *	Command used to act as a backstop implementation when subcommands of
- *	"file" are unsafe (the real implementations of the subcommands are
- *	hidden). The clientData is always the full official subcommand name.
- *
- * Results:
- *	A standard Tcl result (always a TCL_ERROR).
- *
- * Side effects:
- *	None.
- *
- *----------------------------------------------------------------------
- */
-
-static int
-BadFileSubcommand(
-    ClientData clientData,
-    Tcl_Interp *interp,
-    int objc,
-    Tcl_Obj *const objv[])
-{
-    const char *subcommandName = (const char *) clientData;
-
-    Tcl_SetObjResult(interp, Tcl_ObjPrintf(
-	    "not allowed to invoke subcommand %s of file", subcommandName));
-    Tcl_SetErrorCode(interp, "TCL", "SAFE", "SUBCOMMAND", NULL);
-    return TCL_ERROR;
 }
 
 /*
@@ -1366,7 +1102,7 @@ BadFileSubcommand(
 
 static int
 FileAttrAccessTimeCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -1392,9 +1128,14 @@ FileAttrAccessTimeCmd(
 #endif
 
     if (objc == 3) {
+	/*
+	 * Need separate variable for reading longs from an object on 64-bit
+	 * platforms. [Bug 698146]
+	 */
+
 	Tcl_WideInt newTime;
 
-	if (Tcl_GetWideIntFromObj(interp, objv[2], &newTime) != TCL_OK) {
+	if (TclGetWideIntFromObj(interp, objv[2], &newTime) != TCL_OK) {
 	    return TCL_ERROR;
 	}
 
@@ -1443,7 +1184,7 @@ FileAttrAccessTimeCmd(
 
 static int
 FileAttrModifyTimeCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -1475,7 +1216,7 @@ FileAttrModifyTimeCmd(
 
 	Tcl_WideInt newTime;
 
-	if (Tcl_GetWideIntFromObj(interp, objv[2], &newTime) != TCL_OK) {
+	if (TclGetWideIntFromObj(interp, objv[2], &newTime) != TCL_OK) {
 	    return TCL_ERROR;
 	}
 
@@ -1522,7 +1263,7 @@ FileAttrModifyTimeCmd(
 
 static int
 FileAttrLinkStatCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -1558,7 +1299,7 @@ FileAttrLinkStatCmd(
 
 static int
 FileAttrStatCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -1594,7 +1335,7 @@ FileAttrStatCmd(
 
 static int
 FileAttrTypeCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -1632,7 +1373,7 @@ FileAttrTypeCmd(
 
 static int
 FileAttrSizeCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -1669,7 +1410,7 @@ FileAttrSizeCmd(
 
 static int
 FileAttrIsDirectoryCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -1707,7 +1448,7 @@ FileAttrIsDirectoryCmd(
 
 static int
 FileAttrIsExecutableCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -1738,7 +1479,7 @@ FileAttrIsExecutableCmd(
 
 static int
 FileAttrIsExistingCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -1769,7 +1510,7 @@ FileAttrIsExistingCmd(
 
 static int
 FileAttrIsFileCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -1807,7 +1548,7 @@ FileAttrIsFileCmd(
 
 static int
 FileAttrIsOwnedCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -1854,7 +1595,7 @@ FileAttrIsOwnedCmd(
 
 static int
 FileAttrIsReadableCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -1885,7 +1626,7 @@ FileAttrIsReadableCmd(
 
 static int
 FileAttrIsWritableCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -1916,7 +1657,7 @@ FileAttrIsWritableCmd(
 
 static int
 PathDirNameCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -1955,7 +1696,7 @@ PathDirNameCmd(
 
 static int
 PathExtensionCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -1994,7 +1735,7 @@ PathExtensionCmd(
 
 static int
 PathRootNameCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -2033,7 +1774,7 @@ PathRootNameCmd(
 
 static int
 PathTailCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -2072,7 +1813,7 @@ PathTailCmd(
 
 static int
 PathFilesystemCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -2113,7 +1854,7 @@ PathFilesystemCmd(
 
 static int
 PathJoinCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -2145,7 +1886,7 @@ PathJoinCmd(
 
 static int
 PathNativeNameCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -2182,7 +1923,7 @@ PathNativeNameCmd(
 
 static int
 PathNormalizeCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -2220,7 +1961,7 @@ PathNormalizeCmd(
 
 static int
 PathSplitCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -2263,7 +2004,7 @@ PathSplitCmd(
 
 static int
 PathTypeCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -2311,7 +2052,7 @@ PathTypeCmd(
 
 static int
 FilesystemSeparatorCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -2321,7 +2062,7 @@ FilesystemSeparatorCmd(
 	return TCL_ERROR;
     }
     if (objc == 1) {
-	const char *separator = NULL; /* lint */
+	const char *separator = NULL;
 
 	switch (tclPlatform) {
 	case TCL_PLATFORM_UNIX:
@@ -2366,7 +2107,7 @@ FilesystemSeparatorCmd(
 
 static int
 FilesystemVolumesCmd(
-    ClientData clientData,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -2493,7 +2234,7 @@ StoreStatData(
 				 * store in varName. */
 {
     Tcl_Obj *field, *value;
-    register unsigned short mode;
+    unsigned short mode;
 
     /*
      * Assume Tcl_ObjSetVar2() does not keep a copy of the field name!
@@ -2518,23 +2259,23 @@ StoreStatData(
      * cast might fail when there isn't a real arithmetic 'long long' type...
      */
 
-    STORE_ARY("dev",	Tcl_NewLongObj((long)statPtr->st_dev));
+    STORE_ARY("dev",	Tcl_NewWideIntObj((long)statPtr->st_dev));
     STORE_ARY("ino",	Tcl_NewWideIntObj((Tcl_WideInt)statPtr->st_ino));
-    STORE_ARY("nlink",	Tcl_NewLongObj((long)statPtr->st_nlink));
-    STORE_ARY("uid",	Tcl_NewLongObj((long)statPtr->st_uid));
-    STORE_ARY("gid",	Tcl_NewLongObj((long)statPtr->st_gid));
+    STORE_ARY("nlink",	Tcl_NewWideIntObj((long)statPtr->st_nlink));
+    STORE_ARY("uid",	Tcl_NewWideIntObj((long)statPtr->st_uid));
+    STORE_ARY("gid",	Tcl_NewWideIntObj((long)statPtr->st_gid));
     STORE_ARY("size",	Tcl_NewWideIntObj((Tcl_WideInt)statPtr->st_size));
 #ifdef HAVE_STRUCT_STAT_ST_BLOCKS
     STORE_ARY("blocks",	Tcl_NewWideIntObj((Tcl_WideInt)statPtr->st_blocks));
 #endif
 #ifdef HAVE_STRUCT_STAT_ST_BLKSIZE
-    STORE_ARY("blksize", Tcl_NewLongObj((long)statPtr->st_blksize));
+    STORE_ARY("blksize", Tcl_NewWideIntObj((long)statPtr->st_blksize));
 #endif
     STORE_ARY("atime",	Tcl_NewWideIntObj(Tcl_GetAccessTimeFromStat(statPtr)));
     STORE_ARY("mtime",	Tcl_NewWideIntObj(Tcl_GetModificationTimeFromStat(statPtr)));
     STORE_ARY("ctime",	Tcl_NewWideIntObj(Tcl_GetChangeTimeFromStat(statPtr)));
     mode = (unsigned short) statPtr->st_mode;
-    STORE_ARY("mode",	Tcl_NewIntObj(mode));
+    STORE_ARY("mode",	Tcl_NewWideIntObj(mode));
     STORE_ARY("type",	Tcl_NewStringObj(GetTypeFromMode(mode), -1));
 #undef STORE_ARY
 
@@ -2624,20 +2365,19 @@ GetTypeFromMode(
  *----------------------------------------------------------------------
  */
 
-	/* ARGSUSED */
 int
 Tcl_ForObjCmd(
-    ClientData dummy,		/* Not used. */
+    ClientData clientData,
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
-    return Tcl_NRCallObjProc(interp, TclNRForObjCmd, dummy, objc, objv);
+    return Tcl_NRCallObjProc(interp, TclNRForObjCmd, clientData, objc, objv);
 }
 
 int
 TclNRForObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
@@ -2672,7 +2412,7 @@ ForSetupCallback(
     Tcl_Interp *interp,
     int result)
 {
-    ForIterData *iterPtr = data[0];
+    ForIterData *iterPtr = (ForIterData *)data[0];
 
     if (result != TCL_OK) {
 	if (result == TCL_ERROR) {
@@ -2691,7 +2431,7 @@ TclNRForIterCallback(
     Tcl_Interp *interp,
     int result)
 {
-    ForIterData *iterPtr = data[0];
+    ForIterData *iterPtr = (ForIterData *)data[0];
     Tcl_Obj *boolObj;
 
     switch (result) {
@@ -2727,8 +2467,8 @@ ForCondCallback(
     int result)
 {
     Interp *iPtr = (Interp *) interp;
-    ForIterData *iterPtr = data[0];
-    Tcl_Obj *boolObj = data[1];
+    ForIterData *iterPtr = (ForIterData *)data[0];
+    Tcl_Obj *boolObj = (Tcl_Obj *)data[1];
     int value;
 
     if (result != TCL_OK) {
@@ -2765,7 +2505,7 @@ ForNextCallback(
     int result)
 {
     Interp *iPtr = (Interp *) interp;
-    ForIterData *iterPtr = data[0];
+    ForIterData *iterPtr = (ForIterData *)data[0];
     Tcl_Obj *next = iterPtr->next;
 
     if ((result == TCL_OK) || (result == TCL_CONTINUE)) {
@@ -2789,7 +2529,7 @@ ForPostNextCallback(
     Tcl_Interp *interp,
     int result)
 {
-    ForIterData *iterPtr = data[0];
+    ForIterData *iterPtr = (ForIterData *)data[0];
 
     if ((result != TCL_BREAK) && (result != TCL_OK)) {
 	if (result == TCL_ERROR) {
@@ -2819,20 +2559,19 @@ ForPostNextCallback(
  *----------------------------------------------------------------------
  */
 
-	/* ARGSUSED */
 int
 Tcl_ForeachObjCmd(
-    ClientData dummy,		/* Not used. */
+    ClientData clientData,
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
-    return Tcl_NRCallObjProc(interp, TclNRForeachCmd, dummy, objc, objv);
+    return Tcl_NRCallObjProc(interp, TclNRForeachCmd, clientData, objc, objv);
 }
 
 int
 TclNRForeachCmd(
-    ClientData dummy,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -2842,17 +2581,17 @@ TclNRForeachCmd(
 
 int
 Tcl_LmapObjCmd(
-    ClientData dummy,		/* Not used. */
+    ClientData clientData,
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
 {
-    return Tcl_NRCallObjProc(interp, TclNRLmapCmd, dummy, objc, objv);
+    return Tcl_NRCallObjProc(interp, TclNRLmapCmd, clientData, objc, objv);
 }
 
 int
 TclNRLmapCmd(
-    ClientData dummy,
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,
     int objc,
     Tcl_Obj *const objv[])
@@ -2870,7 +2609,7 @@ EachloopCmd(
     Tcl_Obj *const objv[])
 {
     int numLists = (objc-2) / 2;
-    register struct ForeachState *statePtr;
+    struct ForeachState *statePtr;
     int i, j, result;
 
     if (objc < 4 || (objc%2 != 0)) {
@@ -2894,7 +2633,7 @@ EachloopCmd(
      * allocation for better performance.
      */
 
-    statePtr = TclStackAlloc(interp,
+    statePtr = (struct ForeachState *)TclStackAlloc(interp,
 	    sizeof(struct ForeachState) + 3 * numLists * sizeof(int)
 	    + 2 * numLists * (sizeof(Tcl_Obj **) + sizeof(Tcl_Obj *)));
     memset(statePtr, 0,
@@ -2995,7 +2734,7 @@ ForeachLoopStep(
     Tcl_Interp *interp,
     int result)
 {
-    register struct ForeachState *statePtr = data[0];
+    struct ForeachState *statePtr = (struct ForeachState *)data[0];
 
     /*
      * Process the result code from this run of the [foreach] body. Note that
@@ -3137,10 +2876,9 @@ ForeachCleanup(
  *----------------------------------------------------------------------
  */
 
-	/* ARGSUSED */
 int
 Tcl_FormatObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */

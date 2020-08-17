@@ -19,6 +19,9 @@
 /* Defined when compiler supports casting to union type. */
 #undef HAVE_CAST_TO_UNION
 
+/* Define to 1 if you have the `cfmakeraw' function. */
+#undef HAVE_CFMAKERAW
+
 /* Define to 1 if you have the `chflags' function. */
 #undef HAVE_CHFLAGS
 
@@ -42,8 +45,15 @@
    you don't. */
 #undef HAVE_DECL_GETHOSTBYNAME_R
 
+/* Define to 1 if you have the declaration of `PTHREAD_MUTEX_RECURSIVE', and
+   to 0 if you don't. */
+#undef HAVE_DECL_PTHREAD_MUTEX_RECURSIVE
+
 /* Is 'DIR64' in <sys/types.h>? */
 #undef HAVE_DIR64
+
+/* Is eventfd(2) supported? */
+#undef HAVE_EVENTFD
 
 /* Define to 1 if you have the `freeaddrinfo' function. */
 #undef HAVE_FREEADDRINFO
@@ -189,6 +199,9 @@
 /* Are characters signed? */
 #undef HAVE_SIGNED_CHAR
 
+/* Do we have <stdbool.h>? */
+#undef HAVE_STDBOOL_H
+
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
 
@@ -227,6 +240,15 @@
 
 /* Define to 1 if `st_blocks' is a member of `struct stat'. */
 #undef HAVE_STRUCT_STAT_ST_BLOCKS
+
+/* Define to 1 if you have the <sys/epoll.h> header file. */
+#undef HAVE_SYS_EPOLL_H
+
+/* Define to 1 if you have the <sys/eventfd.h> header file. */
+#undef HAVE_SYS_EVENTFD_H
+
+/* Define to 1 if you have the <sys/event.h> header file. */
+#undef HAVE_SYS_EVENT_H
 
 /* Define to 1 if you have the <sys/filio.h> header file. */
 #undef HAVE_SYS_FILIO_H
@@ -297,6 +319,12 @@
 /* Use compat implementation of getaddrinfo() and friends */
 #undef NEED_FAKE_RFC2553
 
+/* Is epoll(7) supported? */
+#undef NOTIFIER_EPOLL
+
+/* Is kqueue(2) supported? */
+#undef NOTIFIER_KQUEUE
+
 /* Is Darwin CoreFoundation unavailable for 64-bit? */
 #undef NO_COREFOUNDATION_64
 
@@ -308,9 +336,6 @@
 
 /* Do we have fd_set? */
 #undef NO_FD_SET
-
-/* Do we have <float.h>? */
-#undef NO_FLOAT_H
 
 /* Do we have fstatfs()? */
 #undef NO_FSTATFS
@@ -347,9 +372,6 @@
 
 /* Do we have a usable 'union wait'? */
 #undef NO_UNION_WAIT
-
-/* Do we have <values.h>? */
-#undef NO_VALUES_H
 
 /* Do we have wait3() */
 #undef NO_WAIT3
@@ -408,23 +430,20 @@
 /* What is the default extension for shared libraries? */
 #undef TCL_SHLIB_EXT
 
-/* Are we building with threads enabled? */
-#undef TCL_THREADS
-
-/* Build libtommath? */
-#undef TCL_TOMMATH
-
 /* Do we allow unloading of shared libraries? */
 #undef TCL_UNLOAD_DLLS
 
 /* Does this platform have wide high-resolution clicks? */
 #undef TCL_WIDE_CLICKS
 
-/* Are wide integers to be implemented with C 'long's? */
+/* Do 'long' and 'long long' have the same size (64-bit)? */
 #undef TCL_WIDE_INT_IS_LONG
 
 /* What type should be used to define wide integers? */
 #undef TCL_WIDE_INT_TYPE
+
+/* Tcl with external libtommath */
+#undef TCL_WITH_EXTERNAL_TOMMATH
 
 /* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
 #undef TIME_WITH_SYS_TIME
@@ -441,9 +460,6 @@
 /* Should we use FIONBIO? */
 #undef USE_FIONBIO
 
-/* Do we want to use the threaded memory allocator? */
-#undef USE_THREAD_ALLOC
-
 /* Should we use vfork() instead of fork()? */
 #undef USE_VFORK
 
@@ -458,6 +474,9 @@
 #  undef WORDS_BIGENDIAN
 # endif
 #endif
+
+/* Are we building with zipfs enabled? */
+#undef ZIPFS_BUILD
 
 /* Are Darwin SUSv3 extensions available? */
 #undef _DARWIN_C_SOURCE

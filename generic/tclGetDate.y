@@ -716,12 +716,12 @@ TclDateerror(
     Tcl_AppendToObj(infoPtr->messages, infoPtr->separatrix, -1);
     Tcl_AppendToObj(infoPtr->messages, s, -1);
     Tcl_AppendToObj(infoPtr->messages, " (characters ", -1);
-    t = Tcl_NewIntObj(location->first_column);
+    TclNewIntObj(t, location->first_column);
     Tcl_IncrRefCount(t);
     Tcl_AppendObjToObj(infoPtr->messages, t);
     Tcl_DecrRefCount(t);
     Tcl_AppendToObj(infoPtr->messages, "-", -1);
-    t = Tcl_NewIntObj(location->last_column);
+    TclNewIntObj(t, location->last_column);
     Tcl_IncrRefCount(t);
     Tcl_AppendObjToObj(infoPtr->messages, t);
     Tcl_DecrRefCount(t);
@@ -959,7 +959,7 @@ TclDatelex(
 
 int
 TclClockOldscanObjCmd(
-    void *dummy,		/* Unused */
+    TCL_UNUSED(void *),
     Tcl_Interp *interp,		/* Tcl interpreter */
     int objc,			/* Count of paraneters */
     Tcl_Obj *const *objv)	/* Parameters */
@@ -969,7 +969,6 @@ TclClockOldscanObjCmd(
     DateInfo dateInfo;
     DateInfo* info = &dateInfo;
     int status;
-    (void)dummy;
 
     if (objc != 5) {
 	Tcl_WrongNumArgs(interp, 1, objv,

@@ -18,6 +18,10 @@
 /* See [Bug 3354324]: file mtime sets wrong time */
 #   define __MINGW_USE_VC2005_COMPAT
 #endif
+#if defined(_MSC_VER) && defined(_WIN64) && !defined(STATIC_BUILD) \
+	&& !defined(MP_32BIT) && !defined(MP_64BIT)
+#   define MP_64BIT
+#endif
 
 /*
  * We must specify the lower version we intend to support.
@@ -45,21 +49,14 @@ typedef DWORD_PTR * PDWORD_PTR;
 /*
  * Ask for the winsock function typedefs, also.
  */
-#define INCL_WINSOCK_API_TYPEDEFS   1
+#ifndef INCL_WINSOCK_API_TYPEDEFS
+#   define INCL_WINSOCK_API_TYPEDEFS   1
+#endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #ifdef HAVE_WSPIAPI_H
 #   include <wspiapi.h>
 #endif
-
-#ifdef CHECK_UNICODE_CALLS
-#   define _UNICODE
-#   define UNICODE
-#   define __TCHAR_DEFINED
-    typedef float *_TCHAR;
-#   define _TCHAR_DEFINED
-    typedef float *TCHAR;
-#endif /* CHECK_UNICODE_CALLS */
 
 /*
  *  Pull in the typedef of TCHAR for windows.
@@ -95,6 +92,11 @@ typedef DWORD_PTR * PDWORD_PTR;
 #   include <inttypes.h>
 #endif
 #include <limits.h>
+#ifdef HAVE_STDINT_H
+#   include <stdint.h>
+#else
+#   include "../compat/stdint.h"
+#endif
 
 #ifndef __GNUC__
 #    define strncasecmp _strnicmp
@@ -557,7 +559,7 @@ typedef DWORD_PTR * PDWORD_PTR;
  * address platform-specific issues.
  */
 
-#define TclpReleaseFile(file)	ckfree((char *) file)
+#define TclpReleaseFile(file)	ckfree(file)
 
 /*
  * The following macros and declarations wrap the C runtime library

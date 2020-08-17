@@ -164,23 +164,23 @@ test autoMkindex-2.1 {commands on the autoload path can be imported} -setup {
 
 # Test auto_mkindex hooks
 
-# Slave hook executes interesting code in the interp used to watch code.
-test autoMkindex-3.1 {slaveHook} -setup {
+# Child hook executes interesting code in the interp used to watch code.
+test autoMkindex-3.1 {childHook} -setup {
     file delete tclIndex
 } -body {
-    auto_mkindex_parser::slavehook {
+    auto_mkindex_parser::childhook {
 	_%@namespace eval ::blt {
 	    proc foo {} {}
 	    _%@namespace export foo
 	}
     }
-    auto_mkindex_parser::slavehook { _%@namespace import -force ::blt::* }
+    auto_mkindex_parser::childhook { _%@namespace import -force ::blt::* }
     auto_mkindex . autoMkindex.tcl
     file exists tclIndex
 } -cleanup {
     # Reset initCommands to avoid trashing other tests
     AutoMkindexTestReset
-} -result 1 
+} -result 1
 # The auto_mkindex_parser::command is used to register commands that create
 # new commands.
 test autoMkindex-3.2 {auto_mkindex_parser::command} -setup {

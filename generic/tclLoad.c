@@ -115,7 +115,7 @@ static void		LoadCleanupProc(ClientData clientData,
 
 int
 Tcl_LoadObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
@@ -271,7 +271,7 @@ Tcl_LoadObjCmd(
      */
 
     if (pkgPtr != NULL) {
-	ipFirstPtr = Tcl_GetAssocData(target, "tclLoad", NULL);
+	ipFirstPtr = (InterpPackage *)Tcl_GetAssocData(target, "tclLoad", NULL);
 	for (ipPtr = ipFirstPtr; ipPtr != NULL; ipPtr = ipPtr->nextPtr) {
 	    if (ipPtr->pkgPtr == pkgPtr) {
 		code = TCL_OK;
@@ -401,12 +401,12 @@ Tcl_LoadObjCmd(
 	 * Create a new record to describe this package.
 	 */
 
-	pkgPtr = ckalloc(sizeof(LoadedPackage));
+	pkgPtr = (LoadedPackage *)ckalloc(sizeof(LoadedPackage));
 	len = strlen(fullFileName) + 1;
-	pkgPtr->fileName	   = ckalloc(len);
+	pkgPtr->fileName	   = (char *)ckalloc(len);
 	memcpy(pkgPtr->fileName, fullFileName, len);
-	len = (unsigned) Tcl_DStringLength(&pkgName) + 1;
-	pkgPtr->packageName	   = ckalloc(len);
+	len = Tcl_DStringLength(&pkgName) + 1;
+	pkgPtr->packageName	   = (char *)ckalloc(len);
 	memcpy(pkgPtr->packageName, Tcl_DStringValue(&pkgName), len);
 	pkgPtr->loadHandle	   = loadHandle;
 	pkgPtr->initProc	   = initProc;
@@ -470,6 +470,19 @@ Tcl_LoadObjCmd(
      */
 
     if (code != TCL_OK) {
+#if defined(TCL_NO_DEPRECATED) || TCL_MAJOR_VERSION > 8
+	Interp *iPtr = (Interp *) target;
+	if (iPtr->result && *(iPtr->result) && !iPtr->freeProc) {
+	    /*
+	     * A call to Tcl_InitStubs() determined the caller extension and
+	     * this interp are incompatible in their stubs mechanisms, and
+	     * recorded the error in the oldest legacy place we have to do so.
+	     */
+	    Tcl_SetObjResult(target, Tcl_NewStringObj(iPtr->result, -1));
+	    iPtr->result =  &tclEmptyString;
+	    iPtr->freeProc = NULL;
+	}
+#endif /* defined(TCL_NO_DEPRECATED) */
 	Tcl_TransferResult(target, code, interp);
 	goto done;
     }
@@ -494,8 +507,8 @@ Tcl_LoadObjCmd(
      * static packages at the head of the linked list!
      */
 
-    ipFirstPtr = Tcl_GetAssocData(target, "tclLoad", NULL);
-    ipPtr = ckalloc(sizeof(InterpPackage));
+    ipFirstPtr = (InterpPackage *)Tcl_GetAssocData(target, "tclLoad", NULL);
+    ipPtr = (InterpPackage *)ckalloc(sizeof(InterpPackage));
     ipPtr->pkgPtr = pkgPtr;
     ipPtr->nextPtr = ipFirstPtr;
     Tcl_SetAssocData(target, "tclLoad", LoadCleanupProc, ipPtr);
@@ -529,7 +542,7 @@ Tcl_LoadObjCmd(
 
 int
 Tcl_UnloadObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
@@ -707,7 +720,7 @@ Tcl_UnloadObjCmd(
 
     code = TCL_ERROR;
     if (pkgPtr != NULL) {
-	ipFirstPtr = Tcl_GetAssocData(target, "tclLoad", NULL);
+	ipFirstPtr = (InterpPackage *)Tcl_GetAssocData(target, "tclLoad", NULL);
 	for (ipPtr = ipFirstPtr; ipPtr != NULL; ipPtr = ipPtr->nextPtr) {
 	    if (ipPtr->pkgPtr == pkgPtr) {
 		code = TCL_OK;
@@ -862,7 +875,7 @@ Tcl_UnloadObjCmd(
 		 * Remove this library from the interpreter's library cache.
 		 */
 
-		ipFirstPtr = Tcl_GetAssocData(target, "tclLoad", NULL);
+		ipFirstPtr = (InterpPackage *)Tcl_GetAssocData(target, "tclLoad", NULL);
 		ipPtr = ipFirstPtr;
 		if (ipPtr->pkgPtr == defaultPtr) {
 		    ipFirstPtr = ipFirstPtr->nextPtr;
@@ -969,10 +982,10 @@ Tcl_StaticPackage(
      */
 
     if (pkgPtr == NULL) {
-	pkgPtr = ckalloc(sizeof(LoadedPackage));
-	pkgPtr->fileName	= ckalloc(1);
+	pkgPtr = (LoadedPackage *)ckalloc(sizeof(LoadedPackage));
+	pkgPtr->fileName	= (char *)ckalloc(1);
 	pkgPtr->fileName[0]	= 0;
-	pkgPtr->packageName	= ckalloc(strlen(pkgName) + 1);
+	pkgPtr->packageName	= (char *)ckalloc(strlen(pkgName) + 1);
 	strcpy(pkgPtr->packageName, pkgName);
 	pkgPtr->loadHandle	= NULL;
 	pkgPtr->initProc	= initProc;
@@ -990,7 +1003,7 @@ Tcl_StaticPackage(
 	 * it's already loaded.
 	 */
 
-	ipFirstPtr = Tcl_GetAssocData(interp, "tclLoad", NULL);
+	ipFirstPtr = (InterpPackage *)Tcl_GetAssocData(interp, "tclLoad", NULL);
 	for (ipPtr = ipFirstPtr; ipPtr != NULL; ipPtr = ipPtr->nextPtr) {
 	    if (ipPtr->pkgPtr == pkgPtr) {
 		return;
@@ -998,11 +1011,11 @@ Tcl_StaticPackage(
 	}
 
 	/*
-	 * Package isn't loade in the current interp yet. Mark it as now being
+	 * Package isn't loaded in the current interp yet. Mark it as now being
 	 * loaded.
 	 */
 
-	ipPtr = ckalloc(sizeof(InterpPackage));
+	ipPtr = (InterpPackage *)ckalloc(sizeof(InterpPackage));
 	ipPtr->pkgPtr = pkgPtr;
 	ipPtr->nextPtr = ipFirstPtr;
 	Tcl_SetAssocData(interp, "tclLoad", LoadCleanupProc, ipPtr);
@@ -1012,10 +1025,10 @@ Tcl_StaticPackage(
 /*
  *----------------------------------------------------------------------
  *
- * TclGetLoadedPackages --
+ * TclGetLoadedPackages, TclGetLoadedPackagesEx --
  *
  *	This function returns information about all of the files that are
- *	loaded (either in a particular intepreter, or for all interpreters).
+ *	loaded (either in a particular interpreter, or for all interpreters).
  *
  * Results:
  *	The return value is a standard Tcl completion code. If successful, a
@@ -1039,16 +1052,27 @@ TclGetLoadedPackages(
 				 * otherwise, just return info about this
 				 * interpreter. */
 {
+    return TclGetLoadedPackagesEx(interp, targetName, NULL);
+}
+
+int
+TclGetLoadedPackagesEx(
+    Tcl_Interp *interp,		/* Interpreter in which to return information
+				 * or error message. */
+    const char *targetName,	/* Name of target interpreter or NULL. If
+				 * NULL, return info about all interps;
+				 * otherwise, just return info about this
+				 * interpreter. */
+    const char *packageName)	/* Package name or NULL. If NULL, return info
+				 * for all packages.
+				 */
+{
     Tcl_Interp *target;
     LoadedPackage *pkgPtr;
     InterpPackage *ipPtr;
     Tcl_Obj *resultObj, *pkgDesc[2];
 
     if (targetName == NULL) {
-	/*
-	 * Return information about all of the available packages.
-	 */
-
 	resultObj = Tcl_NewObj();
 	Tcl_MutexLock(&packageMutex);
 	for (pkgPtr = firstPackagePtr; pkgPtr != NULL;
@@ -1063,16 +1087,38 @@ TclGetLoadedPackages(
 	return TCL_OK;
     }
 
+    target = Tcl_GetSlave(interp, targetName);
+    if (target == NULL) {
+	return TCL_ERROR;
+    }
+    ipPtr = (InterpPackage *)Tcl_GetAssocData(target, "tclLoad", NULL);
+
+    /*
+     * Return information about all of the available packages.
+     */
+    if (packageName) {
+	resultObj = NULL;
+
+	for (; ipPtr != NULL; ipPtr = ipPtr->nextPtr) {
+	    pkgPtr = ipPtr->pkgPtr;
+
+	    if (!strcmp(packageName, pkgPtr->packageName)) {
+		resultObj = Tcl_NewStringObj(pkgPtr->fileName, -1);
+		break;
+	    }
+	}
+
+	if (resultObj) {
+	    Tcl_SetObjResult(interp, resultObj);
+	}
+	return TCL_OK;
+    }
+
     /*
      * Return information about only the packages that are loaded in a given
      * interpreter.
      */
 
-    target = Tcl_GetSlave(interp, targetName);
-    if (target == NULL) {
-	return TCL_ERROR;
-    }
-    ipPtr = Tcl_GetAssocData(target, "tclLoad", NULL);
     resultObj = Tcl_NewObj();
     for (; ipPtr != NULL; ipPtr = ipPtr->nextPtr) {
 	pkgPtr = ipPtr->pkgPtr;
@@ -1106,11 +1152,11 @@ static void
 LoadCleanupProc(
     ClientData clientData,	/* Pointer to first InterpPackage structure
 				 * for interp. */
-    Tcl_Interp *interp)		/* Interpreter that is being deleted. */
+    TCL_UNUSED(Tcl_Interp *))
 {
     InterpPackage *ipPtr, *nextPtr;
 
-    ipPtr = clientData;
+    ipPtr = (InterpPackage *)clientData;
     while (ipPtr != NULL) {
 	nextPtr = ipPtr->nextPtr;
 	ckfree(ipPtr);

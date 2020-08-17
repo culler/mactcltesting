@@ -8,6 +8,13 @@ jobs:
       osx_image: xcode11.5
       env:
         - BUILD_DIR=macosx
+      before_install: &libtommath
+        - cd ${BUILD_DIR}
+        - git clone https://github.com/libtom/libtommath.git
+        - cd libtommath
+        - make
+        - make install
+        - cd ..
       install: []
       script: &mactest
         - make all
@@ -24,6 +31,7 @@ jobs:
       osx_image: xcode11
       env:
         - BUILD_DIR=macosx
+      before_install: *libtommath
       install: []
       script: *mactest
     - name: "macOS/Xcode 10/Shared"
@@ -31,6 +39,7 @@ jobs:
       osx_image: xcode10.3
       env:
         - BUILD_DIR=macosx
+      before_install: *libtommath
       install: []
       script: *mactest
     - name: "macOS/Xcode 9/Shared"
@@ -38,6 +47,7 @@ jobs:
       osx_image: xcode9.2
       env:
         - BUILD_DIR=macosx
+      before_install: *libtommath
       install: []
       script: *mactest
     - name: "macOS/Xcode 8/Shared"
@@ -45,15 +55,9 @@ jobs:
       osx_image: xcode8.3
       env:
         - BUILD_DIR=macosx
+      before_install: *libtommath
       install: []
       script: *mactest
-before_install:
-  - cd ${BUILD_DIR}
-  - git clone https://github.com/libtom/libtommath.git
-  - cd libtommath
-  - make
-  - make install
-  - cd ..
 install:
   - mkdir "$HOME/install dir"
   - ./configure ${CFGOPT} "--prefix=$HOME/install dir" || (cat config.log && exit 1)

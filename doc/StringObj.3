@@ -37,7 +37,7 @@ Tcl_UniChar *
 Tcl_UniChar *
 \fBTcl_GetUnicode\fR(\fIobjPtr\fR)
 .sp
-Tcl_UniChar
+int
 \fBTcl_GetUniChar\fR(\fIobjPtr, index\fR)
 .sp
 int
@@ -204,8 +204,8 @@ where the caller does not need the length of the unicode string
 representation.
 .PP
 \fBTcl_GetUniChar\fR returns the \fIindex\fR'th character in the
-value's Unicode representation. The index is assumed to be in the
-appropriate range.
+value's Unicode representation. If the index is out of range or
+it references a low surrogate preceded by a high surrogate, it returns -1;
 .PP
 \fBTcl_GetRange\fR returns a newly created value comprised of the
 characters between \fIfirst\fR and \fIlast\fR (inclusive) in the
@@ -249,7 +249,9 @@ must be a NULL pointer to indicate the end of the list.
 .PP
 \fBTcl_AppendStringsToObjVA\fR is the same as \fBTcl_AppendStringsToObj\fR
 except that instead of taking a variable number of arguments it takes an
-argument list.
+argument list.  Interfaces using argument lists have been found to be
+nonportable in practice. This function is deprecated and will be removed
+in Tcl 9.0.
 .PP
 \fBTcl_AppendLimitedToObj\fR is similar to \fBTcl_AppendToObj\fR
 except that it imposes a limit on how many bytes are appended.

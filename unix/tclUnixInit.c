@@ -9,8 +9,6 @@
  */
 
 #include "tclInt.h"
-#include <stddef.h>
-#include <locale.h>
 #ifdef HAVE_LANGINFO
 #   include <langinfo.h>
 #   ifdef __APPLE__
@@ -33,11 +31,20 @@
 #endif
 
 #ifdef __CYGWIN__
+#ifdef __cplusplus
+extern "C" {
+#endif
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wignored-attributes"
+#endif
 DLLIMPORT extern __stdcall unsigned char GetVersionExW(void *);
 DLLIMPORT extern __stdcall void *GetModuleHandleW(const void *);
 DLLIMPORT extern __stdcall void FreeLibrary(void *);
 DLLIMPORT extern __stdcall void *GetProcAddress(void *, const char *);
 DLLIMPORT extern __stdcall void GetSystemInfo(void *);
+#ifdef __cplusplus
+}
+#endif
 
 #define NUMPROCESSORS 11
 static const char *const processors[NUMPROCESSORS] = {
@@ -110,7 +117,7 @@ static char pkgPath[sizeof(TCL_PACKAGE_PATH)+200] = TCL_PACKAGE_PATH;
  * first list checked for a mapping from env encoding to Tcl encoding name.
  */
 
-typedef struct LocaleTable {
+typedef struct {
     const char *lang;
     const char *encoding;
 } LocaleTable;
@@ -316,7 +323,7 @@ static int		MacOSXGetLibraryPath(Tcl_Interp *interp,
 #endif /* HAVE_COREFOUNDATION */
 #if defined(__APPLE__) && (defined(TCL_LOAD_FROM_MEMORY) || ( \
 	defined(MAC_OS_X_VERSION_MIN_REQUIRED) && ( \
-	(defined(TCL_THREADS) && MAC_OS_X_VERSION_MIN_REQUIRED < 1030) || \
+	(TCL_THREADS && MAC_OS_X_VERSION_MIN_REQUIRED < 1030) || \
 	(defined(__LP64__) && MAC_OS_X_VERSION_MIN_REQUIRED < 1050) || \
 	(defined(HAVE_COREFOUNDATION) && MAC_OS_X_VERSION_MIN_REQUIRED < 1050)\
 	)))
@@ -386,14 +393,6 @@ TclpInitPlatform(void)
 #endif /* SIGPIPE */
 
 #if defined(__FreeBSD__) && defined(__GNUC__)
-    /*
-     * Adjust the rounding mode to be more conventional. Note that FreeBSD
-     * only provides the __fpsetreg() used by the following two for the GNU
-     * Compiler. When using, say, Intel's icc they break. (Partially based on
-     * patch in BSD ports system from root@celsius.bychok.com)
-     */
-
-    fpsetround(FP_RN);
     (void) fpsetmask(0L);
 #endif
 
@@ -419,7 +418,7 @@ TclpInitPlatform(void)
     /*
      * In case the initial locale is not "C", ensure that the numeric
      * processing is done in "C" locale regardless. This is needed because Tcl
-     * relies on routines like strtod, but should not have locale dependent
+     * relies on routines like strtol/strtoul, but should not have locale dependent
      * behavior.
      */
 
@@ -456,7 +455,7 @@ TclpInitPlatform(void)
 void
 TclpInitLibraryPath(
     char **valuePtr,
-    int *lengthPtr,
+    unsigned int *lengthPtr,
     Tcl_Encoding *encodingPtr)
 {
 #define LIBRARY_SIZE	    32
@@ -545,9 +544,10 @@ TclpInitLibraryPath(
     Tcl_DStringFree(&buffer);
 
     *encodingPtr = Tcl_GetEncoding(NULL, NULL);
-    str = Tcl_GetStringFromObj(pathPtr, lengthPtr);
-    *valuePtr = (char *)ckalloc((*lengthPtr) + 1);
-    memcpy(*valuePtr, str, (size_t)(*lengthPtr)+1);
+    str = TclGetString(pathPtr);
+    *lengthPtr = pathPtr->length;
+    *valuePtr = (char *)ckalloc(*lengthPtr + 1);
+    memcpy(*valuePtr, str, *lengthPtr + 1);
     Tcl_DecrRefCount(pathPtr);
 }
 
@@ -764,7 +764,7 @@ InitMacLocaleInfoVar(
 	if (!Tcl_CreateNamespace(interp, "::tcl::mac", NULL, NULL)) {
 	    Tcl_ResetResult(interp);
 	}
-	Tcl_SetVar(interp, "::tcl::mac::locale", loc, TCL_GLOBAL_ONLY);
+	Tcl_SetVar2(interp, "::tcl::mac::locale", NULL, loc, TCL_GLOBAL_ONLY);
     }
     CFRelease(localeRef);
 }
@@ -800,9 +800,9 @@ TclpSetVariables(
 	const char *str;
 	CFBundleRef bundleRef;
 
-	Tcl_SetVar(interp, "tclDefaultLibrary", tclLibPath, TCL_GLOBAL_ONLY);
-	Tcl_SetVar(interp, "tcl_pkgPath", tclLibPath, TCL_GLOBAL_ONLY);
-	Tcl_SetVar(interp, "tcl_pkgPath", " ",
+	Tcl_SetVar2(interp, "tclDefaultLibrary", NULL, tclLibPath, TCL_GLOBAL_ONLY);
+	Tcl_SetVar2(interp, "tcl_pkgPath", NULL, tclLibPath, TCL_GLOBAL_ONLY);
+	Tcl_SetVar2(interp, "tcl_pkgPath", NULL, " ",
 		TCL_GLOBAL_ONLY | TCL_APPEND_VALUE);
 
 	str = TclGetEnv("DYLD_FRAMEWORK_PATH", &ds);
@@ -818,9 +818,9 @@ TclpSetVariables(
 		    *p = ' ';
 		}
 	    } while (*p++);
-	    Tcl_SetVar(interp, "tcl_pkgPath", Tcl_DStringValue(&ds),
+	    Tcl_SetVar2(interp, "tcl_pkgPath", NULL, Tcl_DStringValue(&ds),
 		    TCL_GLOBAL_ONLY | TCL_APPEND_VALUE);
-	    Tcl_SetVar(interp, "tcl_pkgPath", " ",
+	    Tcl_SetVar2(interp, "tcl_pkgPath", NULL, " ",
 		    TCL_GLOBAL_ONLY | TCL_APPEND_VALUE);
 	    Tcl_DStringFree(&ds);
 	}
@@ -835,9 +835,9 @@ TclpSetVariables(
 			(unsigned char*) tclLibPath, MAXPATHLEN) &&
 			! TclOSstat(tclLibPath, &statBuf) &&
 			S_ISDIR(statBuf.st_mode)) {
-		    Tcl_SetVar(interp, "tcl_pkgPath", tclLibPath,
+		    Tcl_SetVar2(interp, "tcl_pkgPath", NULL, tclLibPath,
 			    TCL_GLOBAL_ONLY | TCL_APPEND_VALUE);
-		    Tcl_SetVar(interp, "tcl_pkgPath", " ",
+		    Tcl_SetVar2(interp, "tcl_pkgPath", NULL, " ",
 			    TCL_GLOBAL_ONLY | TCL_APPEND_VALUE);
 		}
 		CFRelease(frameworksURL);
@@ -848,20 +848,20 @@ TclpSetVariables(
 			(unsigned char*) tclLibPath, MAXPATHLEN) &&
 			! TclOSstat(tclLibPath, &statBuf) &&
 			S_ISDIR(statBuf.st_mode)) {
-		    Tcl_SetVar(interp, "tcl_pkgPath", tclLibPath,
+		    Tcl_SetVar2(interp, "tcl_pkgPath", NULL, tclLibPath,
 			    TCL_GLOBAL_ONLY | TCL_APPEND_VALUE);
-		    Tcl_SetVar(interp, "tcl_pkgPath", " ",
+		    Tcl_SetVar2(interp, "tcl_pkgPath", NULL, " ",
 			    TCL_GLOBAL_ONLY | TCL_APPEND_VALUE);
 		}
 		CFRelease(frameworksURL);
 	    }
 	}
-	Tcl_SetVar(interp, "tcl_pkgPath", pkgPath,
+	Tcl_SetVar2(interp, "tcl_pkgPath", NULL, pkgPath,
 		TCL_GLOBAL_ONLY | TCL_APPEND_VALUE);
     } else
 #endif /* HAVE_COREFOUNDATION */
     {
-	Tcl_SetVar(interp, "tcl_pkgPath", pkgPath, TCL_GLOBAL_ONLY);
+	Tcl_SetVar2(interp, "tcl_pkgPath", NULL, pkgPath, TCL_GLOBAL_ONLY);
     }
 
 #ifdef DJGPP
@@ -874,7 +874,7 @@ TclpSetVariables(
 #ifdef __CYGWIN__
 	unameOK = 1;
     if (!osInfoInitialized) {
-	HANDLE handle = GetModuleHandleW(L"NTDLL");
+	void *handle = GetModuleHandleW(L"NTDLL");
 	int(__stdcall *getversion)(void *) =
 		(int(__stdcall *)(void *))GetProcAddress(handle, "RtlGetVersion");
 	osInfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFOW);
@@ -1009,7 +1009,7 @@ TclpFindVariable(
 				 * searches). */
 {
     int i, result = -1;
-    register const char *env, *p1, *p2;
+    const char *env, *p1, *p2;
     Tcl_DString envString;
 
     Tcl_DStringInit(&envString);
@@ -1054,22 +1054,27 @@ TclpFindVariable(
  */
 
 #ifdef HAVE_COREFOUNDATION
+#ifdef TCL_FRAMEWORK
 static int
 MacOSXGetLibraryPath(
     Tcl_Interp *interp,
     int maxPathLen,
     char *tclLibPath)
 {
-    int foundInFramework = TCL_ERROR;
-
-#ifdef TCL_FRAMEWORK
-    foundInFramework = Tcl_MacOSXOpenVersionedBundleResources(interp,
+    return Tcl_MacOSXOpenVersionedBundleResources(interp,
 	    "com.tcltk.tcllibrary", TCL_FRAMEWORK_VERSION, 0, maxPathLen,
 	    tclLibPath);
-#endif
-
-    return foundInFramework;
 }
+#else
+static int
+MacOSXGetLibraryPath(
+    TCL_UNUSED(Tcl_Interp *),
+    TCL_UNUSED(int),
+    TCL_UNUSED(char *))
+{
+    return TCL_ERROR;
+}
+#endif
 #endif /* HAVE_COREFOUNDATION */
 
 /*

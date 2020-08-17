@@ -42,7 +42,7 @@ typedef struct FileHandler {
  * handlers are ready to fire.
  */
 
-typedef struct FileHandlerEvent {
+typedef struct {
     Tcl_Event header;		/* Information that is standard for all
 				 * events. */
     int fd;			/* File descriptor that is ready. Used to find
@@ -232,7 +232,7 @@ InitNotifier(void)
 
 static void
 NotifierExitHandler(
-    ClientData clientData)	/* Not used. */
+    TCL_UNUSED(ClientData))
 {
     if (notifier.currentTimeout != 0) {
 	XtRemoveTimeOut(notifier.currentTimeout);
@@ -305,7 +305,7 @@ SetTimer(
 
 static void
 TimerProc(
-    XtPointer clientData, /* Not used. */
+    TCL_UNUSED(XtPointer),
     XtIntervalId *id)
 {
     if (*id != notifier.currentTimeout) {
@@ -359,7 +359,7 @@ CreateFileHandler(
 	}
     }
     if (filePtr == NULL) {
-	filePtr = ckalloc(sizeof(FileHandler));
+	filePtr = (FileHandler *)ckalloc(sizeof(FileHandler));
 	filePtr->fd = fd;
 	filePtr->read = 0;
 	filePtr->write = 0;
@@ -525,7 +525,7 @@ FileProc(
      */
 
     filePtr->readyMask |= mask;
-    fileEvPtr = ckalloc(sizeof(FileHandlerEvent));
+    fileEvPtr = (FileHandlerEvent *)ckalloc(sizeof(FileHandlerEvent));
     fileEvPtr->header.proc = FileHandlerEventProc;
     fileEvPtr->fd = filePtr->fd;
     Tcl_QueueEvent((Tcl_Event *) fileEvPtr, TCL_QUEUE_TAIL);

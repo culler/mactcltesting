@@ -387,7 +387,7 @@ TclpGetNativePathType(
 {
     Tcl_PathType type = TCL_PATH_ABSOLUTE;
     int pathLen;
-    const char *path = Tcl_GetStringFromObj(pathPtr, &pathLen);
+    const char *path = TclGetStringFromObj(pathPtr, &pathLen);
 
     if (path[0] == '~') {
 	/*
@@ -578,7 +578,7 @@ Tcl_SplitPath(
     size = 1;
     for (i = 0; i < *argcPtr; i++) {
 	Tcl_ListObjIndex(NULL, resultPtr, i, &eltPtr);
-	Tcl_GetStringFromObj(eltPtr, &len);
+	TclGetStringFromObj(eltPtr, &len);
 	size += len + 1;
     }
 
@@ -587,7 +587,7 @@ Tcl_SplitPath(
      * plus the argv pointers and the terminating NULL pointer.
      */
 
-    *argvPtr = ckalloc((((*argcPtr) + 1) * sizeof(char *)) + size);
+    *argvPtr = (const char **)ckalloc((((*argcPtr) + 1) * sizeof(char *)) + size);
 
     /*
      * Position p after the last argv pointer and copy the contents of the
@@ -597,8 +597,8 @@ Tcl_SplitPath(
     p = (char *) &(*argvPtr)[(*argcPtr) + 1];
     for (i = 0; i < *argcPtr; i++) {
 	Tcl_ListObjIndex(NULL, resultPtr, i, &eltPtr);
-	str = Tcl_GetStringFromObj(eltPtr, &len);
-	memcpy(p, str, (size_t) len+1);
+	str = TclGetStringFromObj(eltPtr, &len);
+	memcpy(p, str, len + 1);
 	p += len+1;
     }
 
@@ -821,7 +821,7 @@ Tcl_FSJoinToPath(
 	return TclJoinPath(2, pair, 0);
     } else {
 	int elemc = objc + 1;
-	Tcl_Obj *ret, **elemv = ckalloc(elemc*sizeof(Tcl_Obj *));
+	Tcl_Obj *ret, **elemv = (Tcl_Obj**)ckalloc(elemc*sizeof(Tcl_Obj *));
 
 	elemv[0] = pathPtr;
 	memcpy(elemv+1, objv, objc*sizeof(Tcl_Obj *));
@@ -857,7 +857,7 @@ TclpNativeJoinPath(
     const char *p;
     const char *start;
 
-    start = Tcl_GetStringFromObj(prefix, &length);
+    start = TclGetStringFromObj(prefix, &length);
 
     /*
      * Remove the ./ from tilde prefixed elements, and drive-letter prefixed
@@ -885,7 +885,7 @@ TclpNativeJoinPath(
 
 	if (length > 0 && (start[length-1] != '/')) {
 	    Tcl_AppendToObj(prefix, "/", 1);
-	    Tcl_GetStringFromObj(prefix, &length);
+	    TclGetStringFromObj(prefix, &length);
 	}
 	needsSep = 0;
 
@@ -921,7 +921,7 @@ TclpNativeJoinPath(
 	if ((length > 0) &&
 		(start[length-1] != '/') && (start[length-1] != ':')) {
 	    Tcl_AppendToObj(prefix, "/", 1);
-	    Tcl_GetStringFromObj(prefix, &length);
+	    TclGetStringFromObj(prefix, &length);
 	}
 	needsSep = 0;
 
@@ -1003,7 +1003,7 @@ Tcl_JoinPath(
      * Store the result.
      */
 
-    resultStr = Tcl_GetStringFromObj(resultObj, &len);
+    resultStr = TclGetStringFromObj(resultObj, &len);
     Tcl_DStringAppend(resultPtr, resultStr, len);
     Tcl_DecrRefCount(resultObj);
 
@@ -1072,7 +1072,7 @@ Tcl_TranslateFileName(
      */
 
     if (tclPlatform == TCL_PLATFORM_WINDOWS) {
-	register char *p;
+	char *p;
 	for (p = Tcl_DStringValue(bufferPtr); *p != '\0'; p++) {
 	    if (*p == '/') {
 		*p = '\\';
@@ -1217,10 +1217,9 @@ DoTildeSubst(
  *----------------------------------------------------------------------
  */
 
-	/* ARGSUSED */
 int
 Tcl_GlobObjCmd(
-    ClientData dummy,		/* Not used. */
+    TCL_UNUSED(ClientData),
     Tcl_Interp *interp,		/* Current interpreter. */
     int objc,			/* Number of arguments. */
     Tcl_Obj *const objv[])	/* Argument objects. */
@@ -1249,7 +1248,7 @@ Tcl_GlobObjCmd(
     for (i = 1; i < objc; i++) {
 	if (Tcl_GetIndexFromObj(interp, objv[i], options, "option", 0,
 		&index) != TCL_OK) {
-	    string = Tcl_GetStringFromObj(objv[i], &length);
+	    string = TclGetStringFromObj(objv[i], &length);
 	    if (string[0] == '-') {
 		/*
 		 * It looks like the command contains an option so signal an
@@ -1344,7 +1343,7 @@ Tcl_GlobObjCmd(
 	return TCL_ERROR;
     }
 
-    separators = NULL;		/* lint. */
+    separators = NULL;
     switch (tclPlatform) {
     case TCL_PLATFORM_UNIX:
 	separators = "/";
@@ -1357,7 +1356,7 @@ Tcl_GlobObjCmd(
     if (dir == PATH_GENERAL) {
 	int pathlength;
 	const char *last;
-	const char *first = Tcl_GetStringFromObj(pathOrDir,&pathlength);
+	const char *first = TclGetStringFromObj(pathOrDir,&pathlength);
 
 	/*
 	 * Find the last path separator in the path
@@ -1449,7 +1448,7 @@ Tcl_GlobObjCmd(
 	if (length <= 0) {
 	    goto skipTypes;
 	}
-	globTypes = TclStackAlloc(interp, sizeof(Tcl_GlobTypeData));
+	globTypes = (Tcl_GlobTypeData *)TclStackAlloc(interp, sizeof(Tcl_GlobTypeData));
 	globTypes->type = 0;
 	globTypes->perm = 0;
 	globTypes->macType = NULL;
@@ -1460,7 +1459,7 @@ Tcl_GlobObjCmd(
 	    const char *str;
 
 	    Tcl_ListObjIndex(interp, typePtr, length, &look);
-	    str = Tcl_GetStringFromObj(look, &len);
+	    str = TclGetStringFromObj(look, &len);
 	    if (strcmp("readonly", str) == 0) {
 		globTypes->perm |= TCL_GLOB_PERM_RONLY;
 	    } else if (strcmp("hidden", str) == 0) {
@@ -1680,9 +1679,8 @@ Tcl_GlobObjCmd(
  *
  * TclGlob --
  *
- *	This procedure prepares arguments for the DoGlob call. It sets the
- *	separator string based on the platform, performs * tilde substitution,
- *	and calls DoGlob.
+ *	Sets the separator string based on the platform, performs tilde
+ *	substitution, and calls DoGlob.
  *
  *	The interpreter's result, on entry to this function, must be a valid
  *	Tcl list (e.g. it could be empty), since we will lappend any new
@@ -1705,7 +1703,6 @@ Tcl_GlobObjCmd(
  *----------------------------------------------------------------------
  */
 
-	/* ARGSUSED */
 int
 TclGlob(
     Tcl_Interp *interp,		/* Interpreter for returning error message or
@@ -1724,7 +1721,7 @@ TclGlob(
     int result;
     Tcl_Obj *filenamesObj, *savedResultObj;
 
-    separators = NULL;		/* lint. */
+    separators = NULL;
     switch (tclPlatform) {
     case TCL_PLATFORM_UNIX:
 	separators = "/";
@@ -1881,7 +1878,7 @@ TclGlob(
 	separators = "/\\";
 
     } else if (tclPlatform == TCL_PLATFORM_UNIX) {
-	if (pathPrefix == NULL && tail[0] == '/') {
+	if (pathPrefix == NULL && tail[0] == '/' && tail[1] != '/') {
 	    pathPrefix = Tcl_NewStringObj(tail, 1);
 	    tail++;
 	    Tcl_IncrRefCount(pathPrefix);
@@ -1992,7 +1989,7 @@ TclGlob(
 	    Tcl_Panic("Called TclGlob with TCL_GLOBMODE_TAILS and pathPrefix==NULL");
 	}
 
-	pre = Tcl_GetStringFromObj(pathPrefix, &prefixLen);
+	pre = TclGetStringFromObj(pathPrefix, &prefixLen);
 	if (prefixLen > 0
 		&& (strchr(separators, pre[prefixLen-1]) == NULL)) {
 	    /*
@@ -2010,7 +2007,7 @@ TclGlob(
 	Tcl_ListObjGetElements(NULL, filenamesObj, &objc, &objv);
 	for (i = 0; i< objc; i++) {
 	    int len;
-	    const char *oldStr = Tcl_GetStringFromObj(objv[i], &len);
+	    const char *oldStr = TclGetStringFromObj(objv[i], &len);
 	    Tcl_Obj *elem;
 
 	    if (len == prefixLen) {
@@ -2077,7 +2074,7 @@ SkipToChar(
     int match)			/* Character to find. */
 {
     int quoted, level;
-    register char *p;
+    char *p;
 
     quoted = 0;
     level = 0;
@@ -2362,7 +2359,7 @@ DoGlob(
 			Tcl_Obj *fixme, *newObj;
 
 			Tcl_ListObjIndex(NULL, matchesObj, repair, &fixme);
-			bytes = Tcl_GetStringFromObj(fixme, &numBytes);
+			bytes = TclGetStringFromObj(fixme, &numBytes);
 			newObj = Tcl_NewStringObj(bytes+2, numBytes-2);
 			Tcl_ListObjReplace(NULL, matchesObj, repair, 1,
 				1, &newObj);
@@ -2400,7 +2397,7 @@ DoGlob(
 	Tcl_DStringAppend(&append, pattern, p-pattern);
 
 	if (pathPtr != NULL) {
-	    (void) Tcl_GetStringFromObj(pathPtr, &length);
+	    (void) TclGetStringFromObj(pathPtr, &length);
 	} else {
 	    length = 0;
 	}
@@ -2446,7 +2443,7 @@ DoGlob(
 		 */
 
 		int len;
-		const char *joined = Tcl_GetStringFromObj(joinedPtr,&len);
+		const char *joined = TclGetStringFromObj(joinedPtr,&len);
 
 		if ((len > 0) && (strchr(separators, joined[len-1]) == NULL)) {
 		    Tcl_AppendToObj(joinedPtr, "/", 1);
@@ -2483,7 +2480,7 @@ DoGlob(
 	     */
 
 	    int len;
-	    const char *joined = Tcl_GetStringFromObj(joinedPtr,&len);
+	    const char *joined = TclGetStringFromObj(joinedPtr,&len);
 
 	    if ((len > 0) && (strchr(separators, joined[len-1]) == NULL)) {
 		if (Tcl_FSGetPathType(pathPtr) != TCL_PATH_VOLUME_RELATIVE) {
@@ -2523,7 +2520,7 @@ DoGlob(
 Tcl_StatBuf *
 Tcl_AllocStatBuf(void)
 {
-    return ckalloc(sizeof(Tcl_StatBuf));
+    return (Tcl_StatBuf *)ckalloc(sizeof(Tcl_StatBuf));
 }
 
 /*
@@ -2548,21 +2545,21 @@ unsigned
 Tcl_GetFSDeviceFromStat(
     const Tcl_StatBuf *statPtr)
 {
-    return (unsigned) statPtr->st_dev;
+    return statPtr->st_dev;
 }
 
 unsigned
 Tcl_GetFSInodeFromStat(
     const Tcl_StatBuf *statPtr)
 {
-    return (unsigned) statPtr->st_ino;
+    return statPtr->st_ino;
 }
 
 unsigned
 Tcl_GetModeFromStat(
     const Tcl_StatBuf *statPtr)
 {
-    return (unsigned) statPtr->st_mode;
+    return statPtr->st_mode;
 }
 
 int
@@ -2628,26 +2625,31 @@ Tcl_GetBlocksFromStat(
 #ifdef HAVE_STRUCT_STAT_ST_BLOCKS
     return (Tcl_WideUInt) statPtr->st_blocks;
 #else
-    register unsigned blksize = Tcl_GetBlockSizeFromStat(statPtr);
+    unsigned blksize = Tcl_GetBlockSizeFromStat(statPtr);
 
     return ((Tcl_WideUInt) statPtr->st_size + blksize - 1) / blksize;
 #endif
 }
 
+#ifdef HAVE_STRUCT_STAT_ST_BLKSIZE
 unsigned
 Tcl_GetBlockSizeFromStat(
     const Tcl_StatBuf *statPtr)
 {
-#ifdef HAVE_STRUCT_STAT_ST_BLKSIZE
-    return (unsigned) statPtr->st_blksize;
+    return statPtr->st_blksize;
+}
 #else
+unsigned
+Tcl_GetBlockSizeFromStat(
+    TCL_UNUSED(const Tcl_StatBuf *))
+{
     /*
      * Not a great guess, but will do...
      */
 
     return GUESSED_BLOCK_SIZE;
-#endif
 }
+#endif
 
 /*
  * Local Variables:

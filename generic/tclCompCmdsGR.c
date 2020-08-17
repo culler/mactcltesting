@@ -27,7 +27,6 @@ static void		CompileReturnInternal(CompileEnv *envPtr,
 			    Tcl_Obj *returnOpts);
 static int		IndexTailVarIfKnown(Tcl_Interp *interp,
 			    Tcl_Token *varTokenPtr, CompileEnv *envPtr);
-
 
 /*
  *----------------------------------------------------------------------
@@ -87,8 +86,7 @@ TclCompileGlobalCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -127,9 +125,12 @@ TclCompileGlobalCmd(
 	    return TCL_ERROR;
 	}
 
-	/* TODO: Consider what value can pass through the
-	 * IndexTailVarIfKnown() screen.  Full CompileWord()
-	 * likely does not apply here.  Push known value instead. */
+	/*
+	 * TODO: Consider what value can pass through the
+	 * IndexTailVarIfKnown() screen. Full CompileWord() likely does not
+	 * apply here. Push known value instead.
+	 */
+
 	CompileWord(envPtr, varTokenPtr, interp, i);
 	TclEmitInstInt4(	INST_NSUPVAR, localIndex,	envPtr);
     }
@@ -166,8 +167,7 @@ TclCompileIfCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -270,7 +270,7 @@ TclCompileIfCmd(
 		jumpIndex = jumpFalseFixupArray.next;
 		jumpFalseFixupArray.next++;
 		TclEmitForwardJump(envPtr, TCL_FALSE_JUMP,
-			jumpFalseFixupArray.fixup+jumpIndex);
+			jumpFalseFixupArray.fixup + jumpIndex);
 	    }
 	    code = TCL_OK;
 	}
@@ -317,7 +317,7 @@ TclCompileIfCmd(
 	    }
 	    jumpEndFixupArray.next++;
 	    TclEmitForwardJump(envPtr, TCL_UNCONDITIONAL_JUMP,
-		    jumpEndFixupArray.fixup+jumpIndex);
+		    jumpEndFixupArray.fixup + jumpIndex);
 
 	    /*
 	     * Fix the target of the jumpFalse after the test. Generate a 4
@@ -329,7 +329,7 @@ TclCompileIfCmd(
 
 	    TclAdjustStackDepth(-1, envPtr);
 	    if (TclFixupForwardJumpToHere(envPtr,
-		    jumpFalseFixupArray.fixup+jumpIndex, 120)) {
+		    jumpFalseFixupArray.fixup + jumpIndex, 120)) {
 		/*
 		 * Adjust the code offset for the proceeding jump to the end
 		 * of the "if" command.
@@ -412,7 +412,7 @@ TclCompileIfCmd(
     for (j = jumpEndFixupArray.next;  j > 0;  j--) {
 	jumpIndex = (j - 1);	/* i.e. process the closest jump first. */
 	if (TclFixupForwardJumpToHere(envPtr,
-		jumpEndFixupArray.fixup+jumpIndex, 127)) {
+		jumpEndFixupArray.fixup + jumpIndex, 127)) {
 	    /*
 	     * Adjust the immediately preceeding "ifFalse" jump. We moved it's
 	     * target (just after this jump) down three bytes.
@@ -431,7 +431,7 @@ TclCompileIfCmd(
 		jumpFalseDist += 3;
 		TclStoreInt4AtPtr(jumpFalseDist, (ifFalsePc + 1));
 	    } else {
-		Tcl_Panic("TclCompileIfCmd: unexpected opcode \"%d\" updating ifFalse jump", (int) opCode);
+		Tcl_Panic("TclCompileIfCmd: unexpected opcode \"%d\" updating ifFalse jump", opCode);
 	    }
 	}
     }
@@ -469,8 +469,7 @@ TclCompileIncrCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -587,7 +586,7 @@ TclCompileInfoCommandsCmd(
     DefineLineInformation;	/* TIP #280 */
     Tcl_Token *tokenPtr;
     Tcl_Obj *objPtr;
-    char *bytes;
+    const char *bytes;
 
     /*
      * We require one compile-time known argument for the case we can compile.
@@ -604,7 +603,7 @@ TclCompileInfoCommandsCmd(
     if (!TclWordKnownAtCompileTime(tokenPtr, objPtr)) {
 	goto notCompilable;
     }
-    bytes = Tcl_GetString(objPtr);
+    bytes = TclGetString(objPtr);
 
     /*
      * We require that the argument start with "::" and not have any of "*\[?"
@@ -638,11 +637,10 @@ TclCompileInfoCommandsCmd(
 
 int
 TclCompileInfoCoroutineCmd(
-    Tcl_Interp *interp,		/* Used for error reporting. */
+    TCL_UNUSED(Tcl_Interp *),
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     /*
@@ -666,8 +664,7 @@ TclCompileInfoExistsCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -715,8 +712,7 @@ TclCompileInfoLevelCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     /*
@@ -750,8 +746,7 @@ TclCompileInfoObjectClassCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)
 {
     DefineLineInformation;	/* TIP #280 */
@@ -770,8 +765,7 @@ TclCompileInfoObjectIsACmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)
 {
     DefineLineInformation;	/* TIP #280 */
@@ -806,8 +800,7 @@ TclCompileInfoObjectNamespaceCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)
 {
     DefineLineInformation;	/* TIP #280 */
@@ -844,8 +837,7 @@ TclCompileLappendCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -920,7 +912,7 @@ TclCompileLappendCmd(
 	CompileWord(envPtr, valueTokenPtr, interp, i);
 	valueTokenPtr = TokenAfter(valueTokenPtr);
     }
-    TclEmitInstInt4(	    INST_LIST, numWords-2,		envPtr);
+    TclEmitInstInt4(	    INST_LIST, numWords - 2,		envPtr);
     if (isScalar) {
 	if (localIndex < 0) {
 	    TclEmitOpcode(  INST_LAPPEND_LIST_STK,		envPtr);
@@ -960,8 +952,7 @@ TclCompileLassignCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -997,7 +988,7 @@ TclCompileLassignCmd(
 	 */
 
 	PushVarNameWord(interp, tokenPtr, envPtr, 0, &localIndex,
-		&isScalar, idx+2);
+		&isScalar, idx + 2);
 
 	/*
 	 * Emit instructions to get the idx'th item out of the list value on
@@ -1036,7 +1027,7 @@ TclCompileLassignCmd(
      */
 
     TclEmitInstInt4(		INST_LIST_RANGE_IMM, idx,	envPtr);
-    TclEmitInt4(			TCL_INDEX_END,		envPtr);
+    TclEmitInt4(			(int)TCL_INDEX_END,		envPtr);
 
     return TCL_OK;
 }
@@ -1064,8 +1055,7 @@ TclCompileLindexCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -1087,8 +1077,8 @@ TclCompileLindexCmd(
     }
 
     idxTokenPtr = TokenAfter(valTokenPtr);
-    if (TclGetIndexFromToken(idxTokenPtr, TCL_INDEX_BEFORE, TCL_INDEX_BEFORE,
-	    &idx) == TCL_OK) {
+    if (TclGetIndexFromToken(idxTokenPtr, TCL_INDEX_NONE,
+	    TCL_INDEX_NONE, &idx) == TCL_OK) {
 	/*
 	 * The idxTokenPtr parsed as a valid index value and was
 	 * encoded as expected by INST_LIST_INDEX_IMM.
@@ -1155,8 +1145,7 @@ TclCompileListCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -1241,7 +1230,7 @@ TclCompileListCmd(
 
     if (concat && numWords == 2) {
 	TclEmitInstInt4(	INST_LIST_RANGE_IMM, 0,	envPtr);
-	TclEmitInt4(			TCL_INDEX_END,	envPtr);
+	TclEmitInt4(			(int)TCL_INDEX_END,	envPtr);
     }
     return TCL_OK;
 }
@@ -1269,8 +1258,7 @@ TclCompileLlengthCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -1302,8 +1290,7 @@ TclCompileLrangeCmd(
     Tcl_Interp *interp,		/* Tcl interpreter for context. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the
 				 * command. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds the resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -1316,8 +1303,8 @@ TclCompileLrangeCmd(
     listTokenPtr = TokenAfter(parsePtr->tokenPtr);
 
     tokenPtr = TokenAfter(listTokenPtr);
-    if (TclGetIndexFromToken(tokenPtr, TCL_INDEX_START, TCL_INDEX_AFTER,
-	    &idx1) != TCL_OK) {
+    if ((TclGetIndexFromToken(tokenPtr, TCL_INDEX_START, TCL_INDEX_NONE,
+	    &idx1) != TCL_OK) || (idx1 == (int)TCL_INDEX_NONE)) {
 	return TCL_ERROR;
     }
     /*
@@ -1326,7 +1313,7 @@ TclCompileLrangeCmd(
      */
 
     tokenPtr = TokenAfter(tokenPtr);
-    if (TclGetIndexFromToken(tokenPtr, TCL_INDEX_BEFORE, TCL_INDEX_END,
+    if (TclGetIndexFromToken(tokenPtr, TCL_INDEX_NONE, TCL_INDEX_END,
 	    &idx2) != TCL_OK) {
 	return TCL_ERROR;
     }
@@ -1363,8 +1350,7 @@ TclCompileLinsertCmd(
     Tcl_Interp *interp,		/* Tcl interpreter for context. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the
 				 * command. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds the resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -1406,7 +1392,7 @@ TclCompileLinsertCmd(
     CompileWord(envPtr, listTokenPtr, interp, 1);
     if (parsePtr->numWords == 3) {
 	TclEmitInstInt4(	INST_LIST_RANGE_IMM, 0,		envPtr);
-	TclEmitInt4(			TCL_INDEX_END,		envPtr);
+	TclEmitInt4(			(int)TCL_INDEX_END,		envPtr);
 	return TCL_OK;
     }
 
@@ -1414,12 +1400,12 @@ TclCompileLinsertCmd(
 	tokenPtr = TokenAfter(tokenPtr);
 	CompileWord(envPtr, tokenPtr, interp, i);
     }
-    TclEmitInstInt4(		INST_LIST, i-3,			envPtr);
+    TclEmitInstInt4(		INST_LIST, i - 3,		envPtr);
 
-    if (idx == TCL_INDEX_START) {
+    if (idx == (int)TCL_INDEX_START) {
 	TclEmitInstInt4(	INST_REVERSE, 2,		envPtr);
 	TclEmitOpcode(		INST_LIST_CONCAT,		envPtr);
-    } else if (idx == TCL_INDEX_END) {
+    } else if (idx == (int)TCL_INDEX_END) {
 	TclEmitOpcode(		INST_LIST_CONCAT,		envPtr);
     } else {
 	/*
@@ -1434,15 +1420,15 @@ TclCompileLinsertCmd(
 	 * differ in their interpretation of the "end" index.
 	 */
 
-	if (idx < TCL_INDEX_END) {
+	if (idx < (int)TCL_INDEX_END) {
 	    idx++;
 	}
 	TclEmitInstInt4(	INST_OVER, 1,			envPtr);
 	TclEmitInstInt4(	INST_LIST_RANGE_IMM, 0,		envPtr);
-	TclEmitInt4(			idx-1,			envPtr);
+	TclEmitInt4(			idx - 1,		envPtr);
 	TclEmitInstInt4(	INST_REVERSE, 3,		envPtr);
 	TclEmitInstInt4(	INST_LIST_RANGE_IMM, idx,	envPtr);
-	TclEmitInt4(			TCL_INDEX_END,		envPtr);
+	TclEmitInt4(			(int)TCL_INDEX_END,		envPtr);
 	TclEmitOpcode(		INST_LIST_CONCAT,		envPtr);
 	TclEmitOpcode(		INST_LIST_CONCAT,		envPtr);
     }
@@ -1466,8 +1452,7 @@ TclCompileLreplaceCmd(
     Tcl_Interp *interp,		/* Tcl interpreter for context. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the
 				 * command. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds the resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -1481,13 +1466,13 @@ TclCompileLreplaceCmd(
     listTokenPtr = TokenAfter(parsePtr->tokenPtr);
 
     tokenPtr = TokenAfter(listTokenPtr);
-    if (TclGetIndexFromToken(tokenPtr, TCL_INDEX_START, TCL_INDEX_AFTER,
+    if (TclGetIndexFromToken(tokenPtr, TCL_INDEX_START, TCL_INDEX_NONE,
 	    &idx1) != TCL_OK) {
 	return TCL_ERROR;
     }
 
     tokenPtr = TokenAfter(tokenPtr);
-    if (TclGetIndexFromToken(tokenPtr, TCL_INDEX_BEFORE, TCL_INDEX_END,
+    if (TclGetIndexFromToken(tokenPtr, TCL_INDEX_NONE, TCL_INDEX_END,
 	    &idx2) != TCL_OK) {
 	return TCL_ERROR;
     }
@@ -1503,14 +1488,14 @@ TclCompileLreplaceCmd(
      * we must defer to direct evaluation.
      */
 
-    if (idx1 == TCL_INDEX_AFTER) {
+    if (idx1 == (int)TCL_INDEX_NONE) {
+	suffixStart = (int)TCL_INDEX_NONE;
+    } else if (idx2 == (int)TCL_INDEX_NONE) {
 	suffixStart = idx1;
-    } else if (idx2 == TCL_INDEX_BEFORE) {
-	suffixStart = idx1;
-    } else if (idx2 == TCL_INDEX_END) {
-	suffixStart = TCL_INDEX_AFTER;
-    } else if (((idx2 < TCL_INDEX_END) && (idx1 <= TCL_INDEX_END))
-	    || ((idx2 >= TCL_INDEX_START) && (idx1 >= TCL_INDEX_START))) {
+    } else if (idx2 == (int)TCL_INDEX_END) {
+	suffixStart = (int)TCL_INDEX_NONE;
+    } else if (((idx2 < (int)TCL_INDEX_END) && (idx1 <= (int)TCL_INDEX_END))
+	    || ((idx2 >= (int)TCL_INDEX_START) && (idx1 >= (int)TCL_INDEX_START))) {
 	suffixStart = (idx1 > idx2 + 1) ? idx1 : idx2 + 1;
     } else {
 	return TCL_ERROR;
@@ -1544,11 +1529,11 @@ TclCompileLreplaceCmd(
 	 * and canonicalization side effects.
 	 */
 	TclEmitInstInt4(	INST_LIST_RANGE_IMM, 0,		envPtr);
-	TclEmitInt4(			TCL_INDEX_END,		envPtr);
+	TclEmitInt4(			(int)TCL_INDEX_END,		envPtr);
 	return TCL_OK;
     }
 
-    if (idx1 != TCL_INDEX_START) {
+    if (idx1 != (int)TCL_INDEX_START) {
 	/* Prefix may not be empty; generate bytecode to push it */
 	if (emptyPrefix) {
 	    TclEmitOpcode(	INST_DUP,			envPtr);
@@ -1568,7 +1553,7 @@ TclCompileLreplaceCmd(
 	TclEmitInstInt4(	INST_REVERSE, 2,		envPtr);
     }
 
-    if (suffixStart == TCL_INDEX_AFTER) {
+    if (suffixStart == (int)TCL_INDEX_NONE) {
 	TclEmitOpcode(		INST_POP,			envPtr);
 	if (emptyPrefix) {
 	    PushStringLiteral(envPtr, "");
@@ -1576,7 +1561,7 @@ TclCompileLreplaceCmd(
     } else {
 	/* Suffix may not be empty; generate bytecode to push it */
 	TclEmitInstInt4(	INST_LIST_RANGE_IMM, suffixStart, envPtr);
-	TclEmitInt4(			TCL_INDEX_END,		envPtr);
+	TclEmitInt4(			(int)TCL_INDEX_END,		envPtr);
 	if (!emptyPrefix) {
 	    TclEmitOpcode(	INST_LIST_CONCAT,		envPtr);
 	}
@@ -1630,8 +1615,7 @@ TclCompileLsetCmd(
     Tcl_Interp *interp,		/* Tcl interpreter for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the
 				 * command. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds the resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -1774,11 +1758,10 @@ TclCompileLsetCmd(
 
 int
 TclCompileNamespaceCurrentCmd(
-    Tcl_Interp *interp,		/* Used for error reporting. */
+    TCL_UNUSED(Tcl_Interp *),
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     /*
@@ -1802,8 +1785,7 @@ TclCompileNamespaceCodeCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -1852,8 +1834,7 @@ TclCompileNamespaceOriginCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -1874,8 +1855,7 @@ TclCompileNamespaceQualifiersCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -1910,8 +1890,7 @@ TclCompileNamespaceTailCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -1947,8 +1926,7 @@ TclCompileNamespaceUpvarCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -2008,8 +1986,7 @@ TclCompileNamespaceWhichCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -2072,8 +2049,7 @@ TclCompileRegexpCmd(
     Tcl_Interp *interp,		/* Tcl interpreter for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the
 				 * command. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds the resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -2119,7 +2095,7 @@ TclCompileRegexpCmd(
 	    sawLast++;
 	    i++;
 	    break;
-	} else if ((len > 1) && (strncmp(str,"-nocase",(unsigned)len) == 0)) {
+	} else if ((len > 1) && (strncmp(str, "-nocase", len) == 0)) {
 	    nocase = 1;
 	} else {
 	    /*
@@ -2183,7 +2159,7 @@ TclCompileRegexpCmd(
     }
 
     if (!simple) {
-	CompileWord(envPtr, varTokenPtr, interp, parsePtr->numWords-2);
+	CompileWord(envPtr, varTokenPtr, interp, parsePtr->numWords - 2);
     }
 
     /*
@@ -2191,7 +2167,7 @@ TclCompileRegexpCmd(
      */
 
     varTokenPtr = TokenAfter(varTokenPtr);
-    CompileWord(envPtr, varTokenPtr, interp, parsePtr->numWords-1);
+    CompileWord(envPtr, varTokenPtr, interp, parsePtr->numWords - 1);
 
     if (simple) {
 	if (exact && !nocase) {
@@ -2237,8 +2213,7 @@ TclCompileRegsubCmd(
     Tcl_Interp *interp,		/* Tcl interpreter for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the
 				 * command. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds the resulting instructions. */
 {
     /*
@@ -2293,8 +2268,8 @@ TclCompileRegsubCmd(
     if (!TclWordKnownAtCompileTime(tokenPtr, patternObj)) {
 	goto done;
     }
-    if (Tcl_GetString(patternObj)[0] == '-') {
-	if (strcmp(Tcl_GetString(patternObj), "--") != 0
+    if (TclGetString(patternObj)[0] == '-') {
+	if (strcmp(TclGetString(patternObj), "--") != 0
 		|| parsePtr->numWords == 5) {
 	    goto done;
 	}
@@ -2325,7 +2300,7 @@ TclCompileRegsubCmd(
      * replacement "simple"?
      */
 
-    bytes = Tcl_GetStringFromObj(patternObj, &len);
+    bytes = TclGetStringFromObj(patternObj, &len);
     if (TclReToGlob(NULL, bytes, len, &pattern, &exact, &quantified)
 	    != TCL_OK || exact || quantified) {
 	goto done;
@@ -2359,7 +2334,7 @@ TclCompileRegsubCmd(
 	bytes++;
     }
   isSimpleGlob:
-    for (bytes = Tcl_GetString(replacementObj); *bytes; bytes++) {
+    for (bytes = TclGetString(replacementObj); *bytes; bytes++) {
 	switch (*bytes) {
 	case '\\': case '&':
 	    goto done;
@@ -2373,9 +2348,9 @@ TclCompileRegsubCmd(
     result = TCL_OK;
     bytes = Tcl_DStringValue(&pattern) + 1;
     PushLiteral(envPtr,	bytes, len);
-    bytes = Tcl_GetStringFromObj(replacementObj, &len);
+    bytes = TclGetStringFromObj(replacementObj, &len);
     PushLiteral(envPtr,	bytes, len);
-    CompileWord(envPtr,	stringTokenPtr, interp, parsePtr->numWords-2);
+    CompileWord(envPtr,	stringTokenPtr, interp, parsePtr->numWords - 2);
     TclEmitOpcode(	INST_STR_MAP,	envPtr);
 
   done:
@@ -2412,8 +2387,7 @@ TclCompileReturnCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -2453,7 +2427,7 @@ TclCompileReturnCmd(
      * Allocate some working space.
      */
 
-    objv = TclStackAlloc(interp, numOptionWords * sizeof(Tcl_Obj *));
+    objv = (Tcl_Obj **)TclStackAlloc(interp, numOptionWords * sizeof(Tcl_Obj *));
 
     /*
      * Scan through the return options. If any are unknown at compile time,
@@ -2504,7 +2478,7 @@ TclCompileReturnCmd(
      */
 
     if (explicitResult) {
-	 CompileWord(envPtr, wordTokenPtr, interp, numWords-1);
+	 CompileWord(envPtr, wordTokenPtr, interp, numWords - 1);
     } else {
 	/*
 	 * No explict result argument, so default result is empty string.
@@ -2582,7 +2556,7 @@ TclCompileReturnCmd(
      */
 
     if (explicitResult) {
-	CompileWord(envPtr, wordTokenPtr, interp, numWords-1);
+	CompileWord(envPtr, wordTokenPtr, interp, numWords - 1);
     } else {
 	PushStringLiteral(envPtr, "");
     }
@@ -2635,7 +2609,7 @@ TclCompileSyntaxError(
     const char *bytes = TclGetStringFromObj(msg, &numBytes);
 
     TclErrorStackResetIf(interp, bytes, numBytes);
-    TclEmitPush(TclRegisterNewLiteral(envPtr, bytes, numBytes), envPtr);
+    TclEmitPush(TclRegisterLiteral(envPtr, bytes, numBytes, 0), envPtr);
     CompileReturnInternal(envPtr, INST_SYNTAX, TCL_ERROR, 0,
 	    TclNoErrorStack(interp, Tcl_GetReturnOptions(interp, TCL_ERROR)));
     Tcl_ResetResult(interp);
@@ -2664,8 +2638,7 @@ TclCompileUpvarCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -2771,8 +2744,7 @@ TclCompileVariableCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -2813,12 +2785,12 @@ TclCompileVariableCmd(
 	CompileWord(envPtr, varTokenPtr, interp, i);
 	TclEmitInstInt4(	INST_VARIABLE, localIndex,	envPtr);
 
-	if (i+1 < numWords) {
+	if (i + 1 < numWords) {
 	    /*
 	     * A value has been given: set the variable, pop the value
 	     */
 
-	    CompileWord(envPtr, valueTokenPtr, interp, i+1);
+	    CompileWord(envPtr, valueTokenPtr, interp, i + 1);
 	    Emit14Inst(		INST_STORE_SCALAR, localIndex,	envPtr);
 	    TclEmitOpcode(	INST_POP,			envPtr);
 	}
@@ -2853,7 +2825,7 @@ TclCompileVariableCmd(
 
 static int
 IndexTailVarIfKnown(
-    Tcl_Interp *interp,
+    TCL_UNUSED(Tcl_Interp *),
     Tcl_Token *varTokenPtr,	/* Token representing the variable name */
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
@@ -2894,7 +2866,7 @@ IndexTailVarIfKnown(
     tailName = TclGetStringFromObj(tailPtr, &len);
 
     if (len) {
-	if (*(tailName+len-1) == ')') {
+	if (*(tailName + len - 1) == ')') {
 	    /*
 	     * Possible array: bail out
 	     */
@@ -2908,7 +2880,7 @@ IndexTailVarIfKnown(
 	 */
 
 	for (p = tailName + len -1; p > tailName; p--) {
-	    if ((*p == ':') && (*(p-1) == ':')) {
+	    if ((*p == ':') && (*(p - 1) == ':')) {
 		p++;
 		break;
 	    }
@@ -2945,8 +2917,7 @@ TclCompileObjectNextCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -2970,8 +2941,7 @@ TclCompileObjectNextToCmd(
     Tcl_Interp *interp,		/* Used for error reporting. */
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     DefineLineInformation;	/* TIP #280 */
@@ -2992,11 +2962,10 @@ TclCompileObjectNextToCmd(
 
 int
 TclCompileObjectSelfCmd(
-    Tcl_Interp *interp,		/* Used for error reporting. */
+    TCL_UNUSED(Tcl_Interp *),
     Tcl_Parse *parsePtr,	/* Points to a parse structure for the command
 				 * created by Tcl_ParseCommand. */
-    Command *cmdPtr,		/* Points to defintion of command being
-				 * compiled. */
+    TCL_UNUSED(Command *),
     CompileEnv *envPtr)		/* Holds resulting instructions. */
 {
     /*

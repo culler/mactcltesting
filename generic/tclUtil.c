@@ -15,6 +15,7 @@
 #include "tclInt.h"
 #include "tclParse.h"
 #include "tclStringTrim.h"
+#include "tclTomMath.h"
 #include <math.h>
 
 /*
@@ -107,12 +108,11 @@ static Tcl_ThreadDataKey precisionKey;
 static void		ClearHash(Tcl_HashTable *tablePtr);
 static void		FreeProcessGlobalValue(ClientData clientData);
 static void		FreeThreadHash(ClientData clientData);
-static int		GetEndOffsetFromObj(Tcl_Obj *objPtr, int endValue,
-			    int *indexPtr);
+static int		GetEndOffsetFromObj(Tcl_Interp *interp, Tcl_Obj *objPtr,
+			    size_t endValue, Tcl_WideInt *indexPtr);
 static Tcl_HashTable *	GetThreadHash(Tcl_ThreadDataKey *keyPtr);
-static int		SetEndOffsetFromAny(Tcl_Interp *interp,
-			    Tcl_Obj *objPtr);
-static void		UpdateStringOfEndOffset(Tcl_Obj *objPtr);
+static int		GetWideForIndex(Tcl_Interp *interp, Tcl_Obj *objPtr,
+			    size_t endValue, Tcl_WideInt *widePtr);
 static int		FindElement(Tcl_Interp *interp, const char *string,
 			    int stringLength, const char *typeStr,
 			    const char *typeCode, const char **elementPtr,
@@ -121,16 +121,20 @@ static int		FindElement(Tcl_Interp *interp, const char *string,
 /*
  * The following is the Tcl object type definition for an object that
  * represents a list index in the form, "end-offset". It is used as a
- * performance optimization in TclGetIntForIndex. The internal rep is an
- * integer, so no memory management is required for it.
+ * performance optimization in Tcl_GetIntForIndex. The internal rep is
+ * stored directly in the wideValue, so no memory management is required
+ * for it. This is a caching intrep, keeping the result of a parse
+ * around. This type is only created from a pre-existing string, so an
+ * updateStringProc will never be called and need not exist. The type
+ * is unregistered, so has no need of a setFromAnyProc either.
  */
 
-const Tcl_ObjType tclEndOffsetType = {
+static const Tcl_ObjType endOffsetType = {
     "end-offset",			/* name */
     NULL,				/* freeIntRepProc */
     NULL,				/* dupIntRepProc */
-    UpdateStringOfEndOffset,		/* updateStringProc */
-    SetEndOffsetFromAny
+    NULL,				/* updateStringProc */
+    NULL				/* setFromAnyProc */
 };
 
 /*
@@ -1403,9 +1407,9 @@ TclConvertElement(
      */
 
     if ((src == NULL) || (length == 0) || (*src == '\0' && length == -1)) {
-	src = tclEmptyStringRep;
-	length = 0;
-	conversion = CONVERT_BRACE;
+	p[0] = '{';
+	p[1] = '}';
+	return 2;
     }
 
     /*
@@ -1623,6 +1627,7 @@ Tcl_Merge(
     return result;
 }
 
+#if !defined(TCL_NO_DEPRECATED) && TCL_MAJOR_VERSION < 9
 /*
  *----------------------------------------------------------------------
  *
@@ -1656,6 +1661,7 @@ Tcl_Backslash(
     TclUtfToUniChar(buf, &ch);
     return (char) ch;
 }
+#endif /* !TCL_NO_DEPRECATED */
 
 /*
  *----------------------------------------------------------------------
@@ -1686,7 +1692,7 @@ TclTrimRight(
 			 * rely on (trim[numTrim] == '\0'). */
 {
     const char *pp, *p = bytes + numBytes;
-    Tcl_UniChar ch1 = 0;
+    int ch1, ch2;
 
     /* Empty strings -> nothing to do */
     if ((numBytes == 0) || (numTrim == 0)) {
@@ -1700,12 +1706,11 @@ TclTrimRight(
     do {
 	const char *q = trim;
 	int pInc = 0, bytesLeft = numTrim;
-	Tcl_UniChar ch2 = 0;
 
 	pp = TclUtfPrev(p, bytes);
 	do {
 	    pp += pInc;
- 	    pInc = TclUtfToUniChar(pp, &ch1);
+ 	    pInc = TclUtfToUCS4(pp, &ch1);
 	} while (pp + pInc < p);
 
 	/*
@@ -1713,7 +1718,7 @@ TclTrimRight(
 	 */
 
 	do {
-	    int qInc = TclUtfToUniChar(q, &ch2);
+	    int qInc = TclUtfToUCS4(q, &ch2);
 
 	    if (ch1 == ch2) {
 		break;
@@ -1766,7 +1771,7 @@ TclTrimLeft(
 			 * rely on (trim[numTrim] == '\0'). */
 {
     const char *p = bytes;
-    Tcl_UniChar ch1 = 0;
+	int ch1, ch2;
 
     /* Empty strings -> nothing to do */
     if ((numBytes == 0) || (numTrim == 0)) {
@@ -1778,8 +1783,7 @@ TclTrimLeft(
      */
 
     do {
-	Tcl_UniChar ch2 = 0;
-	int pInc = TclUtfToUniChar(p, &ch1);
+	int pInc = TclUtfToUCS4(p, &ch1);
 	const char *q = trim;
 	int bytesLeft = numTrim;
 
@@ -1788,7 +1792,7 @@ TclTrimLeft(
 	 */
 
 	do {
-	    int qInc = TclUtfToUniChar(q, &ch2);
+	    int qInc = TclUtfToUCS4(q, &ch2);
 
 	    if (ch1 == ch2) {
 		break;
@@ -2013,7 +2017,7 @@ Tcl_ConcatObj(
 	if (TclListObjIsCanonical(objPtr)) {
 	    continue;
 	}
-	Tcl_GetStringFromObj(objPtr, &length);
+	TclGetStringFromObj(objPtr, &length);
 	if (length > 0) {
 	    break;
 	}
@@ -2022,7 +2026,7 @@ Tcl_ConcatObj(
 	resPtr = NULL;
 	for (i = 0;  i < objc;  i++) {
 	    objPtr = objv[i];
-	    if (objPtr->bytes && objPtr->length == 0) {
+	    if (!TclListObjIsCanonical(objPtr)) {
 		continue;
 	    }
 	    if (resPtr) {
@@ -2102,6 +2106,7 @@ Tcl_ConcatObj(
     return resPtr;
 }
 
+#if !defined(TCL_NO_DEPRECATED) && TCL_MAJOR_VERSION < 9
 /*
  *----------------------------------------------------------------------
  *
@@ -2120,6 +2125,7 @@ Tcl_ConcatObj(
  *----------------------------------------------------------------------
  */
 
+#undef Tcl_StringMatch
 int
 Tcl_StringMatch(
     const char *str,		/* String. */
@@ -2128,7 +2134,7 @@ Tcl_StringMatch(
 {
     return Tcl_StringCaseMatch(str, pattern, 0);
 }
-
+#endif /* TCL_NO_DEPRECATED */
 /*
  *----------------------------------------------------------------------
  *
@@ -2202,7 +2208,7 @@ Tcl_StringCaseMatch(
 	    } else {
 		TclUtfToUCS4(pattern, &ch2);
 		if (nocase) {
-		    ch2 = TclUCS4ToLower(ch2);
+		    ch2 = Tcl_UniCharToLower(ch2);
 		}
 	    }
 
@@ -2217,7 +2223,7 @@ Tcl_StringCaseMatch(
 		    if (nocase) {
 			while (*str) {
 			    charLen = TclUtfToUCS4(str, &ch1);
-			    if (ch2==ch1 || ch2==TclUCS4ToLower(ch1)) {
+			    if (ch2==ch1 || ch2==Tcl_UniCharToLower(ch1)) {
 				break;
 			    }
 			    str += charLen;
@@ -2276,7 +2282,7 @@ Tcl_StringCaseMatch(
 	    } else {
 		str += TclUtfToUCS4(str, &ch1);
 		if (nocase) {
-		    ch1 = TclUCS4ToLower(ch1);
+		    ch1 = Tcl_UniCharToLower(ch1);
 		}
 	    }
 	    while (1) {
@@ -2290,7 +2296,7 @@ Tcl_StringCaseMatch(
 		} else {
 		    pattern += TclUtfToUCS4(pattern, &startChar);
 		    if (nocase) {
-			startChar = TclUCS4ToLower(startChar);
+			startChar = Tcl_UniCharToLower(startChar);
 		    }
 		}
 		if (*pattern == '-') {
@@ -2305,7 +2311,7 @@ Tcl_StringCaseMatch(
 		    } else {
 			pattern += TclUtfToUCS4(pattern, &endChar);
 			if (nocase) {
-			    endChar = TclUCS4ToLower(endChar);
+			    endChar = Tcl_UniCharToLower(endChar);
 			}
 		    }
 		    if (((startChar <= ch1) && (ch1 <= endChar))
@@ -2354,7 +2360,7 @@ Tcl_StringCaseMatch(
 	str += TclUtfToUCS4(str, &ch1);
 	pattern += TclUtfToUCS4(pattern, &ch2);
 	if (nocase) {
-	    if (TclUCS4ToLower(ch1) != TclUCS4ToLower(ch2)) {
+	    if (Tcl_UniCharToLower(ch1) != Tcl_UniCharToLower(ch2)) {
 		return 0;
 	    }
 	} else if (ch1 != ch2) {
@@ -2391,7 +2397,7 @@ TclByteArrayMatch(
 				/* Pattern, which may contain special
 				 * characters. */
     int ptnLen,			/* Length of Pattern */
-    int flags)
+    TCL_UNUSED(int) /*flags*/)
 {
     const unsigned char *stringEnd, *patternEnd;
     unsigned char p;
@@ -2576,7 +2582,7 @@ TclStringMatchObj(
     trivial = nocase ? 0 : TclMatchIsTrivial(TclGetString(ptnObj));
      */
 
-    if ((strObj->typePtr == &tclStringType) || (strObj->typePtr == NULL)) {
+    if (TclHasIntRep(strObj, &tclStringType) || (strObj->typePtr == NULL)) {
 	Tcl_UniChar *udata, *uptn;
 
 	udata = Tcl_GetUnicodeFromObj(strObj, &length);
@@ -2715,7 +2721,7 @@ TclDStringAppendObj(
     Tcl_Obj *objPtr)
 {
     int length;
-    char *bytes = Tcl_GetStringFromObj(objPtr, &length);
+    char *bytes = TclGetStringFromObj(objPtr, &length);
 
     return Tcl_DStringAppend(dsPtr, bytes, length);
 }
@@ -2953,7 +2959,6 @@ Tcl_DStringResult(
     Tcl_DString *dsPtr)		/* Dynamic string that is to become the
 				 * result of interp. */
 {
-    Tcl_ResetResult(interp);
     Tcl_SetObjResult(interp, TclDStringToObj(dsPtr));
 }
 
@@ -2983,6 +2988,14 @@ Tcl_DStringGetResult(
     Tcl_DString *dsPtr)		/* Dynamic string that is to become the result
 				 * of interp. */
 {
+#if defined(TCL_NO_DEPRECATED) || TCL_MAJOR_VERSION > 8
+    Tcl_Obj *obj = Tcl_GetObjResult(interp);
+    const char *bytes = TclGetString(obj);
+
+    Tcl_DStringFree(dsPtr);
+    Tcl_DStringAppend(dsPtr, bytes, obj->length);
+    Tcl_ResetResult(interp);
+#else
     Interp *iPtr = (Interp *) interp;
 
     if (dsPtr->string != dsPtr->staticSpace) {
@@ -3006,7 +3019,7 @@ Tcl_DStringGetResult(
 
     if (!iPtr->result[0] && iPtr->objResultPtr
 	    && !Tcl_IsShared(iPtr->objResultPtr)) {
-	if (iPtr->objResultPtr->bytes == tclEmptyStringRep) {
+	if (iPtr->objResultPtr->bytes == &tclEmptyString) {
 	    dsPtr->string = dsPtr->staticSpace;
 	    dsPtr->string[0] = 0;
 	    dsPtr->length = 0;
@@ -3016,7 +3029,7 @@ Tcl_DStringGetResult(
 	    dsPtr->length = iPtr->objResultPtr->length;
 	    dsPtr->spaceAvl = dsPtr->length + 1;
 	    TclFreeIntRep(iPtr->objResultPtr);
-	    iPtr->objResultPtr->bytes = tclEmptyStringRep;
+	    iPtr->objResultPtr->bytes = &tclEmptyString;
 	    iPtr->objResultPtr->length = 0;
 	}
 	return;
@@ -3054,6 +3067,7 @@ Tcl_DStringGetResult(
 
     iPtr->result = iPtr->resultSpace;
     iPtr->resultSpace[0] = 0;
+#endif /* !TCL_NO_DEPRECATED */
 }
 
 /*
@@ -3192,9 +3206,7 @@ Tcl_DStringEndSublist(
 
 void
 Tcl_PrintDouble(
-    Tcl_Interp *interp,		/* Interpreter whose tcl_precision variable
-				 * used to be used to control printing. It's
-				 * ignored now. */
+    TCL_UNUSED(Tcl_Interp *),
     double value,		/* Value to print as string. */
     char *dst)			/* Where to store converted value; must have
 				 * at least TCL_DOUBLE_SPACE characters. */
@@ -3274,13 +3286,13 @@ Tcl_PrintDouble(
 	 * the first (the recommended zero value for tcl_precision avoids the
 	 * problem entirely).
 	 *
-	 * Uncomment TCL_DD_SHORTEN_FLAG in the next call to prefer the method
+	 * Uncomment TCL_DD_SHORTEST in the next call to prefer the method
 	 * that allows floating point values to be shortened if it can be done
 	 * without loss of precision.
 	 */
 
 	digits = TclDoubleDigits(value, *precisionPtr,
-		TCL_DD_E_FORMAT /* | TCL_DD_SHORTEN_FLAG */,
+		TCL_DD_E_FORMAT /* | TCL_DD_SHORTEST */,
 		&exponent, &signum, &end);
     }
     if (signum) {
@@ -3366,16 +3378,17 @@ Tcl_PrintDouble(
  *----------------------------------------------------------------------
  */
 
+#if !defined(TCL_NO_DEPRECATED) && TCL_MAJOR_VERSION < 9
 char *
 TclPrecTraceProc(
-    ClientData clientData,	/* Not used. */
+    ClientData clientData,
     Tcl_Interp *interp,		/* Interpreter containing variable. */
     const char *name1,		/* Name of variable. */
     const char *name2,		/* Second part of variable name. */
     int flags)			/* Information about what happened. */
 {
     Tcl_Obj *value;
-    int prec;
+    Tcl_WideInt prec;
     int *precisionPtr = (int *)Tcl_GetThreadData(&precisionKey, sizeof(int));
 
     /*
@@ -3399,7 +3412,7 @@ TclPrecTraceProc(
 
 
     if (flags & TCL_TRACE_READS) {
-	Tcl_SetVar2Ex(interp, name1, name2, Tcl_NewIntObj(*precisionPtr),
+	Tcl_SetVar2Ex(interp, name1, name2, Tcl_NewWideIntObj(*precisionPtr),
 		flags & TCL_GLOBAL_ONLY);
 	return NULL;
     }
@@ -3415,13 +3428,14 @@ TclPrecTraceProc(
     }
     value = Tcl_GetVar2Ex(interp, name1, name2, flags & TCL_GLOBAL_ONLY);
     if (value == NULL
-	    || Tcl_GetIntFromObj(NULL, value, &prec) != TCL_OK
+	    || Tcl_GetWideIntFromObj(NULL, value, &prec) != TCL_OK
 	    || prec < 0 || prec > TCL_MAX_PREC) {
 	return (char *) "improper value for precision";
     }
-    *precisionPtr = prec;
+    *precisionPtr = (int)prec;
     return NULL;
 }
+#endif /* !TCL_NO_DEPRECATED)*/
 
 /*
  *----------------------------------------------------------------------
@@ -3545,9 +3559,9 @@ int
 TclFormatInt(
     char *buffer,		/* Points to the storage into which the
 				 * formatted characters are written. */
-    long n)			/* The integer to format. */
+    Tcl_WideInt n)			/* The integer to format. */
 {
-    unsigned long intVal;
+	Tcl_WideUInt intVal;
     int i = 0;
     int numFormatted, j;
     static const char digits[] = "0123456789";
@@ -3556,7 +3570,7 @@ TclFormatInt(
      * Generate the characters of the result backwards in the buffer.
      */
 
-    intVal = (n < 0 ? -(unsigned long)n : (unsigned long)n);
+    intVal = (n < 0 ? -(Tcl_WideUInt)n : (Tcl_WideUInt)n);
     do {
 	buffer[i++] = digits[intVal % 10];
 	intVal = intVal / 10;
@@ -3583,34 +3597,89 @@ TclFormatInt(
 /*
  *----------------------------------------------------------------------
  *
- * TclGetIntForIndex --
+ * GetWideForIndex --
  *
- *	Provides an integer corresponding to the list index held in a Tcl
- *	object. The string value 'objPtr' is expected have the format
- *	integer([+-]integer)? or end([+-]integer)?.
+ *	This function produces a wide integer value corresponding to the
+ *	index value held in *objPtr. The parsing supports all values
+ *	recognized as any size of integer, and the syntaxes end[-+]$integer
+ *	and $integer[-+]$integer. The argument endValue is used to give
+ *	the meaning of the literal index value "end". Index arithmetic
+ *	on arguments outside the wide integer range are only accepted
+ *	when interp is a working interpreter, not NULL.
  *
- * Value
- * 	TCL_OK
+ * Results:
+ *	When parsing of *objPtr successfully recognizes an index value,
+ *	TCL_OK is returned, and the wide integer value corresponding to
+ *	the recognized index value is written to *widePtr. When parsing
+ *	fails, TCL_ERROR is returned and error information is written to
+ *	interp, if non-NULL.
  *
- * 	    The index is stored at the address given by by 'indexPtr'. If
- * 	    'objPtr' has the value "end", the value stored is 'endValue'.
+ * Side effects:
+ *	The type of *objPtr may change.
  *
- * 	TCL_ERROR
+ *----------------------------------------------------------------------
+ */
+
+static int
+GetWideForIndex(
+    Tcl_Interp *interp,         /* Interpreter to use for error reporting. If
+                                 * NULL, then no error message is left after
+                                 * errors. */
+    Tcl_Obj *objPtr,            /* Points to the value to be parsed */
+    size_t endValue,            /* The value to be stored at *widePtr if
+                                 * objPtr holds "end".
+                                 * NOTE: this value may be TCL_INDEX_NONE. */
+    Tcl_WideInt *widePtr)       /* Location filled in with a wide integer
+                                 * representing an index. */
+{
+    int numType;
+    ClientData cd;
+    int code = TclGetNumberFromObj(NULL, objPtr, &cd, &numType);
+
+    if (code == TCL_OK) {
+	if (numType == TCL_NUMBER_INT) {
+	    /* objPtr holds an integer in the signed wide range */
+	    *widePtr = *(Tcl_WideInt *)cd;
+	    return TCL_OK;
+	}
+	if (numType == TCL_NUMBER_BIG) {
+	    /* objPtr holds an integer outside the signed wide range */
+	    /* Truncate to the signed wide range. */
+	    *widePtr = ((mp_isneg((mp_int *)cd)) ? WIDE_MIN : WIDE_MAX);
+	    return TCL_OK;
+	}
+    }
+
+    /* objPtr does not hold a number, check the end+/- format... */
+    return GetEndOffsetFromObj(interp, objPtr, endValue, widePtr);
+}
+
+/*
+ *----------------------------------------------------------------------
  *
- * 	    The value of 'objPtr' does not have one of the expected formats. If
- * 	    'interp' is non-NULL, an error message is left in the interpreter's
- * 	    result object.
+ * Tcl_GetIntForIndex --
  *
- * Effect
+ *	This function returns an integer corresponding to the list index held
+ *	in a Tcl object. The Tcl object's value is expected to be in the
+ *	format integer([+-]integer)? or the format end([+-]integer)?.
  *
- * 	The object referenced by 'objPtr' is converted, as needed, to an
- * 	integer, wide integer, or end-based-index object.
+ * Results:
+ *	The return value is normally TCL_OK, which means that the index was
+ *	successfully stored into the location referenced by "indexPtr". If the
+ *	Tcl object referenced by "objPtr" has the value "end", the value
+ *	stored is "endValue". If "objPtr"s values is not of one of the
+ *	expected formats, TCL_ERROR is returned and, if "interp" is non-NULL,
+ *	an error message is left in the interpreter's result object.
+ *
+ * Side effects:
+ *	The object referenced by "objPtr" might be converted to an integer,
+ *	wide integer, or end-based-index object.
  *
  *----------------------------------------------------------------------
  */
 
 int
-TclGetIntForIndex(
+Tcl_GetIntForIndex(
     Tcl_Interp *interp,		/* Interpreter to use for error reporting. If
 				 * NULL, then no error message is left after
 				 * errors. */
@@ -3619,123 +3688,44 @@ TclGetIntForIndex(
     int endValue,		/* The value to be stored at "indexPtr" if
 				 * "objPtr" holds "end". */
     int *indexPtr)		/* Location filled in with an integer
-				 * representing an index. */
+				 * representing an index. May be NULL.*/
 {
-    int length;
-    char *opPtr;
-    const char *bytes;
+    Tcl_WideInt wide;
 
-    if (TclGetIntFromObj(NULL, objPtr, indexPtr) == TCL_OK) {
-	return TCL_OK;
+    if (GetWideForIndex(interp, objPtr, (size_t)(endValue + 1) - 1, &wide) == TCL_ERROR) {
+	return TCL_ERROR;
     }
-
-    if (GetEndOffsetFromObj(objPtr, endValue, indexPtr) == TCL_OK) {
-	return TCL_OK;
-    }
-
-    bytes = TclGetStringFromObj(objPtr, &length);
-
-    /*
-     * Leading whitespace is acceptable in an index.
-     */
-
-    while (length && TclIsSpaceProcM(*bytes)) {
-	bytes++;
-	length--;
-    }
-
-    if (TclParseNumber(NULL, NULL, NULL, bytes, length, (const char **)&opPtr,
-	    TCL_PARSE_INTEGER_ONLY | TCL_PARSE_NO_WHITESPACE) == TCL_OK) {
-	int code, first, second;
-	char savedOp = *opPtr;
-
-	if ((savedOp != '+') && (savedOp != '-')) {
-	    goto parseError;
-	}
-	if (TclIsSpaceProcM(opPtr[1])) {
-	    goto parseError;
-	}
-	*opPtr = '\0';
-	code = Tcl_GetInt(interp, bytes, &first);
-	*opPtr = savedOp;
-	if (code == TCL_ERROR) {
-	    goto parseError;
-	}
-	if (TCL_ERROR == Tcl_GetInt(interp, opPtr+1, &second)) {
-	    goto parseError;
-	}
-	if (savedOp == '+') {
-	    *indexPtr = first + second;
+    if (indexPtr != NULL) {
+	if ((wide < 0) && (endValue > TCL_INDEX_END)) {
+	    *indexPtr = -1;
+	} else if (wide > INT_MAX) {
+	    *indexPtr = INT_MAX;
+	} else if (wide < INT_MIN) {
+	    *indexPtr = INT_MIN;
 	} else {
-	    *indexPtr = first - second;
+	    *indexPtr = (int) wide;
 	}
-	return TCL_OK;
     }
-
-    /*
-     * Report a parse error.
-     */
-
-  parseError:
-    if (interp != NULL) {
-	bytes = TclGetString(objPtr);
-	Tcl_SetObjResult(interp, Tcl_ObjPrintf(
-		"bad index \"%s\": must be integer?[+-]integer? or"
-		" end?[+-]integer?", bytes));
-	if (!strncmp(bytes, "end-", 4)) {
-	    bytes += 4;
-	}
-	TclCheckBadOctal(interp, bytes);
-	Tcl_SetErrorCode(interp, "TCL", "VALUE", "INDEX", NULL);
-    }
-
-    return TCL_ERROR;
+    return TCL_OK;
 }
-
-/*
- *----------------------------------------------------------------------
- *
- * UpdateStringOfEndOffset --
- *
- *	Update the string rep of a Tcl object holding an "end-offset"
- *	expression.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	Stores a valid string in the object's string rep.
- *
- * This function does NOT free any earlier string rep. If it is called on an
- * object that already has a valid string rep, it will leak memory.
- *
- *----------------------------------------------------------------------
- */
-
-static void
-UpdateStringOfEndOffset(
-    Tcl_Obj *objPtr)
-{
-    char buffer[TCL_INTEGER_SPACE + 5];
-    int len = 3;
-
-    memcpy(buffer, "end", 4);
-    if (objPtr->internalRep.longValue != 0) {
-	buffer[len++] = '-';
-	len += TclFormatInt(buffer+len, -(objPtr->internalRep.longValue));
-    }
-    objPtr->bytes = (char *)ckalloc(len+1);
-    memcpy(objPtr->bytes, buffer, len+1);
-    objPtr->length = len;
-}
-
 /*
  *----------------------------------------------------------------------
  *
  * GetEndOffsetFromObj --
  *
- *	Look for a string of the form "end[+-]offset" and convert it to an
- *	internal representation holding the offset.
+ *	Look for a string of the form "end[+-]offset" or "offset[+-]offset" and
+ *	convert it to an internal representation.
+ *
+ *	The internal representation (wideValue) uses the following encoding:
+ *
+ *	WIDE_MIN:   Index value TCL_INDEX_NONE (or -1)
+ *	WIDE_MIN+1: Index value n, for any n < -1  (usually same effect as -1)
+ *	-$n:        Index "end-[expr {$n-1}]"
+ *	-2:         Index "end-1"
+ *	-1:         Index "end"
+ *	0:          Index "0"
+ *	WIDE_MAX-1: Index "end+n", for any n > 1
+ *	WIDE_MAX:   Index "end+1"
  *
  * Results:
  *	Tcl return code.
@@ -3748,119 +3738,240 @@ UpdateStringOfEndOffset(
 
 static int
 GetEndOffsetFromObj(
+    Tcl_Interp *interp,
     Tcl_Obj *objPtr,            /* Pointer to the object to parse */
-    int endValue,               /* The value to be stored at "indexPtr" if
+    size_t endValue,            /* The value to be stored at "indexPtr" if
                                  * "objPtr" holds "end". */
-    int *indexPtr)              /* Location filled in with an integer
+    Tcl_WideInt *widePtr)       /* Location filled in with an integer
                                  * representing an index. */
 {
-    if (SetEndOffsetFromAny(NULL, objPtr) != TCL_OK) {
-	return TCL_ERROR;
+    Tcl_ObjIntRep *irPtr;
+    Tcl_WideInt offset = -1;	/* Offset in the "end-offset" expression - 1 */
+    ClientData cd;
+
+    while ((irPtr = TclFetchIntRep(objPtr, &endOffsetType)) == NULL) {
+	Tcl_ObjIntRep ir;
+	int length;
+	const char *bytes = TclGetStringFromObj(objPtr, &length);
+
+	if (*bytes != 'e') {
+	    int numType;
+	    const char *opPtr;
+	    int length, t1 = 0, t2 = 0;
+
+	    /* Value doesn't start with "e" */
+
+	    /* If we reach here, the string rep of objPtr exists. */
+
+	    /*
+	     * The valid index syntax does not include any value that is
+	     * a list of more than one element. This is necessary so that
+	     * lists of index values can be reliably distinguished from any
+	     * single index value.
+	     */
+
+	    /*
+	     * Quick scan to see if multi-value list is even possible.
+	     * This relies on TclGetString() returning a NUL-terminated string.
+	     */
+	    if ((TclMaxListLength(TclGetString(objPtr), -1, NULL) > 1)
+
+		    /* If it's possible, do the full list parse. */
+	            && (TCL_OK == Tcl_ListObjLength(NULL, objPtr, &length))
+	            && (length > 1)) {
+	        goto parseError;
+	    }
+
+	    /* Passed the list screen, so parse for index arithmetic expression */
+	    if (TCL_OK == TclParseNumber(NULL, objPtr, NULL, NULL, -1, &opPtr,
+	            TCL_PARSE_INTEGER_ONLY)) {
+		Tcl_WideInt w1=0, w2=0;
+
+		/* value starts with valid integer... */
+
+		if ((*opPtr == '-') || (*opPtr == '+')) {
+		    /* ... value continues with [-+] ... */
+
+		    /* Save first integer as wide if possible */
+		    TclGetNumberFromObj(NULL, objPtr, &cd, &t1);
+		    if (t1 == TCL_NUMBER_INT) {
+			w1 = (*(Tcl_WideInt *)cd);
+		    }
+
+		    if (TCL_OK == TclParseNumber(NULL, objPtr, NULL, opPtr + 1,
+			    -1, NULL, TCL_PARSE_INTEGER_ONLY)) {
+			/* ... value concludes with second valid integer */
+
+			/* Save second integer as wide if possible */
+			TclGetNumberFromObj(NULL, objPtr, &cd, &t2);
+			if (t2 == TCL_NUMBER_INT) {
+			    w2 = (*(Tcl_WideInt *)cd);
+			}
+		    }
+		}
+		/* Clear invalid intreps left by TclParseNumber */
+		TclFreeIntRep(objPtr);
+
+		if (t1 && t2) {
+		    /* We have both integer values */
+		    if ((t1 == TCL_NUMBER_INT) && (t2 == TCL_NUMBER_INT)) {
+			/* Both are wide, do wide-integer math */
+			if (*opPtr == '-') {
+			    if ((w2 == WIDE_MIN) && (interp != NULL)) {
+				goto extreme;
+			    }
+			    w2 = -w2;
+			}
+
+			if ((w1 ^ w2) < 0) {
+			    /* Different signs, sum cannot overflow */
+			    offset = w1 + w2;
+			} else if (w1 >= 0) {
+			    if (w1 < WIDE_MAX - w2) {
+				offset = w1 + w2;
+			    } else {
+				offset = WIDE_MAX;
+			    }
+			} else {
+			    if (w1 > WIDE_MIN - w2) {
+				offset = w1 + w2;
+			    } else {
+				offset = WIDE_MIN;
+			    }
+			}
+		    } else if (interp == NULL) {
+			/*
+			 * We use an interp to do bignum index calculations.
+			 * If we don't get one, call all indices with bignums errors,
+			 * and rely on callers to handle it.
+			 */
+			goto parseError;
+		    } else {
+			/*
+			 * At least one is big, do bignum math. Little reason to
+			 * value performance here. Re-use code.  Parse has verified
+			 * objPtr is an expression. Compute it.
+			 */
+
+			Tcl_Obj *sum;
+
+		    extreme:
+			Tcl_ExprObj(interp, objPtr, &sum);
+			TclGetNumberFromObj(NULL, sum, &cd, &numType);
+
+			if (numType == TCL_NUMBER_INT) {
+			    /* sum holds an integer in the signed wide range */
+			    offset = *(Tcl_WideInt *)cd;
+			} else {
+			    /* sum holds an integer outside the signed wide range */
+			    /* Truncate to the signed wide range. */
+			    if (mp_isneg((mp_int *)cd)) {
+				offset = WIDE_MIN;
+			    } else {
+				offset = WIDE_MAX;
+			    }
+			}
+			Tcl_DecrRefCount(sum);
+		    }
+		    if (offset < 0) {
+			offset = (offset == -1) ? WIDE_MIN : WIDE_MIN+1;
+		    }
+		    goto parseOK;
+		}
+	    }
+	    goto parseError;
+	}
+
+	if ((length < 3) || (length == 4) || (strncmp(bytes, "end", 3) != 0)) {
+	    /* Doesn't start with "end" */
+	    goto parseError;
+	}
+	if (length > 4) {
+	    int t;
+
+	    /* Parse for the "end-..." or "end+..." formats */
+
+	    if ((bytes[3] != '-') && (bytes[3] != '+')) {
+		/* No operator where we need one */
+		goto parseError;
+	    }
+	    if (TclIsSpaceProc(bytes[4])) {
+		/* Space after + or - not permitted. */
+		goto parseError;
+	    }
+
+	    /* Parse the integer offset */
+	    if (TCL_OK != TclParseNumber(NULL, objPtr, NULL,
+			bytes+4, length-4, NULL, TCL_PARSE_INTEGER_ONLY)) {
+		/* Not a recognized integer format */
+		goto parseError;
+	    }
+
+	    /* Got an integer offset; pull it from where parser left it. */
+	    TclGetNumberFromObj(NULL, objPtr, &cd, &t);
+
+	    if (t == TCL_NUMBER_BIG) {
+		/* Truncate to the signed wide range. */
+		if (mp_isneg((mp_int *)cd)) {
+		    offset = (bytes[3] == '-') ? WIDE_MAX : WIDE_MIN;
+		} else {
+		    offset = (bytes[3] == '-') ? WIDE_MIN : WIDE_MAX;
+		}
+	    } else {
+		/* assert (t == TCL_NUMBER_INT); */
+		offset = (*(Tcl_WideInt *)cd);
+		if (bytes[3] == '-') {
+		    offset = (offset == WIDE_MIN) ? WIDE_MAX : -offset;
+		}
+		if (offset == 1) {
+		    offset = WIDE_MAX; /* "end+1" */
+		} else if (offset > 1) {
+		    offset = WIDE_MAX - 1; /* "end+n", out of range */
+		} else if (offset != WIDE_MIN) {
+		    offset--;
+		}
+	    }
+	}
+
+    parseOK:
+	/* Success. Store the new internal rep. */
+	ir.wideValue = offset;
+	Tcl_StoreIntRep(objPtr, &endOffsetType, &ir);
     }
 
-    /* TODO: Handle overflow cases sensibly */
-    *indexPtr = endValue + (int)objPtr->internalRep.longValue;
-    return TCL_OK;
-}
+    offset = irPtr->wideValue;
 
-
-/*
- *----------------------------------------------------------------------
- *
- * SetEndOffsetFromAny --
- *
- *	Look for a string of the form "end[+-]offset" and convert it to an
- *	internal representation holding the offset.
- *
- * Results:
- *	Returns TCL_OK if ok, TCL_ERROR if the string was badly formed.
- *
- * Side effects:
- *	If interp is not NULL, stores an error message in the interpreter
- *	result.
- *
- *----------------------------------------------------------------------
- */
-
-static int
-SetEndOffsetFromAny(
-    Tcl_Interp *interp,		/* Tcl interpreter or NULL */
-    Tcl_Obj *objPtr)		/* Pointer to the object to parse */
-{
-    int offset;			/* Offset in the "end-offset" expression */
-    const char *bytes;	/* String rep of the object */
-    int length;			/* Length of the object's string rep */
-
-    /*
-     * If it's already the right type, we're fine.
-     */
-
-    if (objPtr->typePtr == &tclEndOffsetType) {
-	return TCL_OK;
-    }
-
-    /*
-     * Check for a string rep of the right form.
-     */
-
-    bytes = TclGetStringFromObj(objPtr, &length);
-    if ((*bytes != 'e') || (strncmp(bytes, "end",
-	    (size_t)((length > 3) ? 3 : length)) != 0)) {
-	if (interp != NULL) {
-	    Tcl_SetObjResult(interp, Tcl_ObjPrintf(
-		    "bad index \"%s\": must be end?[+-]integer?", bytes));
-	    Tcl_SetErrorCode(interp, "TCL", "VALUE", "INDEX", NULL);
-	}
-	return TCL_ERROR;
-    }
-
-    /*
-     * Convert the string rep.
-     */
-
-    if (length <= 3) {
-	offset = 0;
-    } else if ((length > 4) && ((bytes[3] == '-') || (bytes[3] == '+'))) {
-	/*
-	 * This is our limited string expression evaluator. Pass everything
-	 * after "end-" to Tcl_GetInt, then reverse for offset.
-	 */
-
-	if (TclIsSpaceProcM(bytes[4])) {
-	    goto badIndexFormat;
-	}
-	if (Tcl_GetInt(interp, bytes+4, &offset) != TCL_OK) {
-	    return TCL_ERROR;
-	}
-	if (bytes[3] == '-') {
-
-	    /* TODO: Review overflow concerns here! */
-	    offset = -offset;
-	}
+    if (offset == WIDE_MAX) {
+	*widePtr = endValue + 1;
+    } else if (offset == WIDE_MIN) {
+	*widePtr = -1;
+    } else if (endValue == (size_t)-1) {
+	*widePtr = offset;
+    } else if (offset < 0) {
+	/* Different signs, sum cannot overflow */
+	*widePtr = endValue + offset + 1;
+    } else if (offset < WIDE_MAX) {
+	*widePtr = offset;
     } else {
-	/*
-	 * Conversion failed. Report the error.
-	 */
+	*widePtr = WIDE_MAX;
+    }
+    return TCL_OK;
 
-    badIndexFormat:
-	if (interp != NULL) {
-	    Tcl_SetObjResult(interp, Tcl_ObjPrintf(
-		    "bad index \"%s\": must be end?[+-]integer?", bytes));
-	    Tcl_SetErrorCode(interp, "TCL", "VALUE", "INDEX", NULL);
-	}
-	return TCL_ERROR;
+    /* Report a parse error. */
+  parseError:
+    if (interp != NULL) {
+        char * bytes = TclGetString(objPtr);
+        Tcl_SetObjResult(interp, Tcl_ObjPrintf(
+                "bad index \"%s\": must be integer?[+-]integer? or"
+                " end?[+-]integer?", bytes));
+        if (!strncmp(bytes, "end-", 4)) {
+            bytes += 4;
+        }
+        TclCheckBadOctal(interp, bytes);
+        Tcl_SetErrorCode(interp, "TCL", "VALUE", "INDEX", NULL);
     }
 
-    /*
-     * The conversion succeeded. Free the old internal rep and set the new
-     * one.
-     */
-
-    TclFreeIntRep(objPtr);
-    objPtr->internalRep.longValue = offset;
-    objPtr->typePtr = &tclEndOffsetType;
-
-    return TCL_OK;
+    return TCL_ERROR;
 }
 
 /*
@@ -3875,7 +3986,7 @@ SetEndOffsetFromAny(
  *      arithmetic expressions. The absolute index values that can be
  *	directly meaningful as an index into either a list or a string are
  *	those integer values >= TCL_INDEX_START (0)
- *	and < TCL_INDEX_AFTER (INT_MAX).
+ *	and < INT_MAX.
  *      The largest string supported in Tcl 8 has bytelength INT_MAX.
  *      This means the largest supported character length is also INT_MAX,
  *      and the index of the last character in a string of length INT_MAX
@@ -3884,9 +3995,9 @@ SetEndOffsetFromAny(
  *      Any absolute index value parsed outside that range is encoded
  *      using the before and after values passed in by the
  *      caller as the encoding to use for indices that are either
- *      less than or greater than the usable index range. TCL_INDEX_AFTER
+ *      less than or greater than the usable index range. TCL_INDEX_NONE
  *      is available as a good choice for most callers to use for
- *      after. Likewise, the value TCL_INDEX_BEFORE is good for
+ *      after. Likewise, the value TCL_INDEX_NONE is good for
  *      most callers to use for before.  Other values are possible
  *      when the caller knows it is helpful in producing its own behavior
  *      for indices before and after the indexed item.
@@ -3926,47 +4037,32 @@ TclIndexEncode(
     int after,		/* Value to return for index after end */
     int *indexPtr)	/* Where to write the encoded answer, not NULL */
 {
+    Tcl_WideInt wide;
     int idx;
 
-    if (TCL_OK == TclGetIntFromObj(NULL, objPtr, &idx)) {
-        /* We parsed a value in the range INT_MIN...INT_MAX */
-    integerEncode:
-        if (idx < TCL_INDEX_START) {
-            /* All negative absolute indices are "before the beginning" */
-            idx = before;
-        } else if (idx == INT_MAX) {
-            /* This index value is always "after the end" */
-            idx = after;
-        }
-        /* usual case, the absolute index value encodes itself */
-    } else if (TCL_OK == GetEndOffsetFromObj(objPtr, 0, &idx)) {
-        /*
-         * We parsed an end+offset index value.
-         * idx holds the offset value in the range INT_MIN...INT_MAX.
-         */
-        if (idx > 0) {
-            /*
-             * All end+postive or end-negative expressions
-             * always indicate "after the end".
-             */
-            idx = after;
-        } else if (idx < INT_MIN - TCL_INDEX_END) {
-            /* These indices always indicate "before the beginning */
-            idx = before;
-        } else {
-            /* Encoded end-positive (or end+negative) are offset */
-            idx += TCL_INDEX_END;
-        }
-
-    /* TODO: Consider flag to suppress repeated end-offset parse. */
-    } else if (TCL_OK == TclGetIntForIndexM(interp, objPtr, 0, &idx)) {
-        /*
-         * Only reach this case when the index value is a
-         * constant index arithmetic expression, and idx
-         * holds the result. Treat it the same as if it were
-         * parsed as an absolute integer value.
-         */
-        goto integerEncode;
+    if (TCL_OK == GetWideForIndex(interp, objPtr, (unsigned)TCL_INDEX_END , &wide)) {
+	const Tcl_ObjIntRep *irPtr = TclFetchIntRep(objPtr, &endOffsetType);
+	if (irPtr && irPtr->wideValue >= 0) {
+	    /* "int[+-]int" syntax, works the same here as "int" */
+	    irPtr = NULL;
+	}
+	/*
+	 * We parsed an end+offset index value.
+	 * wide holds the offset value in the range WIDE_MIN...WIDE_MAX.
+	 */
+	if (wide > (unsigned)(irPtr ? TCL_INDEX_END : INT_MAX)) {
+	    /*
+	     * All end+postive or end-negative expressions
+	     * always indicate "after the end".
+	     */
+	    idx = after;
+	} else if (wide <= (irPtr ? INT_MAX : TCL_INDEX_NONE)) {
+	    /* These indices always indicate "before the beginning */
+	    idx = before;
+	} else {
+	    /* Encoded end-positive (or end+negative) are offset */
+	    idx = (int)wide;
+	}
     } else {
 	return TCL_ERROR;
     }
@@ -3994,10 +4090,14 @@ TclIndexDecode(
     int encoded,	/* Value to decode */
     int endValue)	/* Meaning of "end" to use, > TCL_INDEX_END */
 {
-    if (encoded <= TCL_INDEX_END) {
-	return (encoded - TCL_INDEX_END) + endValue;
+    if (encoded > TCL_INDEX_END) {
+	return encoded;
     }
-    return encoded;
+    endValue += encoded - TCL_INDEX_END;
+    if (endValue >= 0) {
+	return endValue;
+    }
+    return TCL_INDEX_NONE;
 }
 
 /*
@@ -4213,7 +4313,8 @@ TclSetProcessGlobalValue(
     } else {
 	Tcl_CreateExitHandler(FreeProcessGlobalValue, pgvPtr);
     }
-    bytes = Tcl_GetStringFromObj(newValue, &pgvPtr->numBytes);
+    bytes = TclGetString(newValue);
+    pgvPtr->numBytes = newValue->length;
     pgvPtr->value = (char *)ckalloc(pgvPtr->numBytes + 1);
     memcpy(pgvPtr->value, bytes, pgvPtr->numBytes + 1);
     if (pgvPtr->encoding) {
@@ -4256,7 +4357,7 @@ TclGetProcessGlobalValue(
     Tcl_Obj *value = NULL;
     Tcl_HashTable *cacheMap;
     Tcl_HashEntry *hPtr;
-    int epoch = pgvPtr->epoch;
+    unsigned int epoch = pgvPtr->epoch;
 
     if (pgvPtr->encoding) {
 	Tcl_Encoding current = Tcl_GetEncoding(NULL, NULL);
@@ -4406,11 +4507,10 @@ TclGetObjNameOfExecutable(void)
 const char *
 Tcl_GetNameOfExecutable(void)
 {
-    int numBytes;
-    const char *bytes =
-	    Tcl_GetStringFromObj(TclGetObjNameOfExecutable(), &numBytes);
+    Tcl_Obj *obj = TclGetObjNameOfExecutable();
+    const char *bytes = TclGetString(obj);
 
-    if (numBytes == 0) {
+    if (obj->length == 0) {
 	return NULL;
     }
     return bytes;

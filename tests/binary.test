@@ -10,12 +10,13 @@
 # See the file "license.terms" for information on usage and redistribution of
 # this file, and for a DISCLAIMER OF ALL WARRANTIES.
 
-if {[lsearch [namespace children] ::tcltest] == -1} {
+if {"::tcltest" ni [namespace children]} {
     package require tcltest
     namespace import -force ::tcltest::*
 }
 testConstraint bigEndian [expr {$tcl_platform(byteOrder) eq "bigEndian"}]
 testConstraint littleEndian [expr {$tcl_platform(byteOrder) eq "littleEndian"}]
+testConstraint testbytestring [llength [info commands testbytestring]]
 
 # Big test for correct ordering of data in [expr]
 proc testIEEE {} {
@@ -1647,22 +1648,6 @@ test binary-43.2 {Tcl_BinaryObjCmd: format wide int} {} {
     binary format W 7810179016327718216
 } lcTolleH
 
-test binary-44.1 {Tcl_BinaryObjCmd: scan wide int} {} {
-    binary scan HelloTcl W x
-    set x
-} 5216694956358656876
-test binary-44.2 {Tcl_BinaryObjCmd: scan wide int} {} {
-    binary scan lcTolleH w x
-    set x
-} 5216694956358656876
-test binary-44.3 {Tcl_BinaryObjCmd: scan wide int with bit 31 set} {} {
-    binary scan [binary format w [expr {wide(3) << 31}]] w x
-    set x
-} 6442450944
-test binary-44.4 {Tcl_BinaryObjCmd: scan wide int with bit 31 set} {} {
-    binary scan [binary format W [expr {wide(3) << 31}]] W x
-    set x
-} 6442450944
 test binary-43.5 {Tcl_BinaryObjCmd: scan wide int} {} {
     unset -nocomplain arg1
     list [binary scan \x80[string repeat \x00 7] W arg1] $arg1
@@ -1683,6 +1668,31 @@ test binary-43.9 {Tcl_BinaryObjCmd: scan unsigned wide int} {} {
     unset -nocomplain arg1 arg2
     list [binary scan [string repeat \x00 7]\x80[string repeat \x00 7]\x80 wuw arg1 arg2] $arg1 $arg2
 } {2 9223372036854775808 -9223372036854775808}
+
+test binary-44.1 {Tcl_BinaryObjCmd: scan wide int} {} {
+    binary scan HelloTcl W x
+    set x
+} 5216694956358656876
+test binary-44.2 {Tcl_BinaryObjCmd: scan wide int} {} {
+    binary scan lcTolleH w x
+    set x
+} 5216694956358656876
+test binary-44.3 {Tcl_BinaryObjCmd: scan wide int with bit 31 set} {} {
+    binary scan [binary format w [expr {wide(3) << 31}]] w x
+    set x
+} 6442450944
+test binary-44.4 {Tcl_BinaryObjCmd: scan wide int with bit 31 set} {} {
+    binary scan [binary format W [expr {wide(3) << 31}]] W x
+    set x
+} 6442450944
+test binary-44.5 {Tcl_BinaryObjCmd: scan wide int with bit 31 and 64 set} {} {
+    binary scan [binary format w [expr {(wide(3) << 31) + (wide(3) << 64)}]] w x
+    set x
+} 6442450944
+test binary-44.6 {Tcl_BinaryObjCmd: scan wide int with bit 31 and 64 set} {} {
+    binary scan [binary format W [expr {(wide(3) << 31) + (wide(3) << 64)}]] W x
+    set x
+} 6442450944
 
 test binary-45.1 {Tcl_BinaryObjCmd: combined wide int handling} {
     binary scan [binary format sws 16450 -1 19521] c* x
@@ -2501,9 +2511,9 @@ test binary-71.6 {binary decode hex} -body {
 test binary-71.7 {binary decode hex} -body {
     binary decode hex "61\n\n\n61"
 } -result {aa}
-test binary-71.8 {binary decode hex} -body {
+test binary-71.8 {binary decode hex} -match glob -body {
     binary decode hex -strict "61 61"
-} -returnCodes error -result {invalid hexadecimal digit " " at position 2}
+} -returnCodes error -result {invalid hexadecimal digit " " * at position 2}
 test binary-71.9 {binary decode hex} -body {
     set r [binary decode hex "6"]
     list [string length $r] $r
@@ -2665,11 +2675,11 @@ test binary-73.11 {binary decode base64} -body {
 } -result [string repeat abc 20]
 test binary-73.12 {binary decode base64} -body {
     binary decode base64 -strict ":YWJj"
-} -returnCodes error -match glob -result {invalid base64 character ":" at position 0}
+} -returnCodes error -match glob -result {invalid base64 character ":" * at position 0}
 test binary-73.13 {binary decode base64} -body {
     set s "[string repeat YWJj 10]:[string repeat YWJj 10]"
     binary decode base64 -strict $s
-} -returnCodes error -match glob -result {invalid base64 character ":" at position 40}
+} -returnCodes error -match glob -result {invalid base64 character ":" * at position 40}
 test binary-73.14 {binary decode base64} -body {
     set s "[string repeat YWJj 10]\n    [string repeat YWJj 10]"
     binary decode base64 -strict $s
@@ -2846,11 +2856,11 @@ test binary-75.11 {binary decode uuencode} -body {
 } -result [string repeat abc 20]
 test binary-75.12 {binary decode uuencode} -body {
     binary decode uuencode -strict "|86)C"
-} -returnCodes error -match glob -result {invalid uuencode character "|" at position 0}
+} -returnCodes error -match glob -result {invalid uuencode character "|" * at position 0}
 test binary-75.13 {binary decode uuencode} -body {
     set s ">[string repeat 86)C 10]|[string repeat 86)C 10]"
     binary decode uuencode -strict $s
-} -returnCodes error -match glob -result {invalid uuencode character "|" at position 41}
+} -returnCodes error -match glob -result {invalid uuencode character "|" * at position 41}
 test binary-75.14 {binary decode uuencode} -body {
     set s ">[string repeat 86)C 10]\na[string repeat 86)C 10]"
     binary decode uuencode -strict $s
@@ -2878,7 +2888,7 @@ test binary-75.24 {binary decode uuencode} -body {
 test binary-75.25 {binary decode uuencode} -body {
     set s "#04)\#z"
     binary decode uuencode $s
-} -returnCodes error -match glob -result {invalid uuencode character "z" at position 5}
+} -returnCodes error -match glob -result {invalid uuencode character "z" * at position 5}
 test binary-75.26 {binary decode uuencode} -body {
     string length [binary decode uuencode " "]
 } -result 0
@@ -2902,6 +2912,26 @@ test binary-76.2 {binary string appending growth algorithm} win {
     string length [append str [binary format a* foo]]
 } 3
 
+test binary-77.1 {string cat ops on all bytearrays} {
+    apply {{a b} {
+	return [binary format H* $a][binary format H* $b]
+    }} ab cd
+} [binary format H* abcd]
+test binary-77.2 {string cat ops on all bytearrays} {
+    apply {{a b} {
+	set one [binary format H* $a]
+	return $one[binary format H* $b]
+    }} ab cd
+} [binary format H* abcd]
+
+test binary-78.1 {unicode (out of BMP) to byte-array conversion, bug-[bd94500678]} -body {
+    # just test for BO-segfault (high surrogate w/o advance source pointer for out of BMP char if TCL_UTF_MAX == 3):
+    binary encode hex \U0001f415
+    binary scan \U0001f415 a* v; set v
+    set str {}
+} -result {}
+
+
 testConstraint testsetbytearraylength \
 		[expr {"testsetbytearraylength" in [info commands]}]
 
@@ -2912,7 +2942,19 @@ test binary-79.2 {Tcl_SetByteArrayLength} testsetbytearraylength {
     testsetbytearraylength [string cat \u0141 B C] 1
 } A
 
-
+test binary-80.1 {TclGetBytesFromObj} -constraints testbytestring -returnCodes 1 -body {
+    testbytestring "\u4E4E"
+} -result "expected byte sequence but character 0 was '\u4E4E' (U+004E4E)"
+test binary-80.2 {TclGetBytesFromObj} -constraints testbytestring -returnCodes 1 -body {
+    testbytestring [testbytestring "\x00\xA0\xA0\xA0\xE4\xB9\x8E"]
+} -result "expected byte sequence but character 4 was '\u4E4E' (U+004E4E)"
+test binary-80.3 {TclGetBytesFromObj} -constraints testbytestring -returnCodes 1 -body {
+    testbytestring [testbytestring "\xC0\x80\xA0\xA0\xA0\xE4\xB9\x8E"]
+} -result "expected byte sequence but character 4 was '\u4E4E' (U+004E4E)"
+test binary-80.4 {TclGetBytesFromObj} -constraints testbytestring -returnCodes 1 -body {
+    testbytestring [testbytestring "\xC0\x80\xA0\xA0\xA0\xF0\x9F\x98\x81"]
+} -result "expected byte sequence but character 4 was '\U01F601' (U+01F601)"
+
 # ----------------------------------------------------------------------
 # cleanup
 

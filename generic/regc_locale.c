@@ -840,7 +840,7 @@ element(
      */
 
     Tcl_DStringInit(&ds);
-    np = Tcl_UniCharToUtfDString(startp, (int)len, &ds);
+    np = Tcl_UniCharToUtfDString(startp, len, &ds);
     for (cn=cnames; cn->name!=NULL; cn++) {
 	if (strlen(cn->name)==len && strncmp(cn->name, np, len)==0) {
 	    break;			/* NOTE BREAK OUT */
@@ -1252,7 +1252,7 @@ cmp(
     const chr *x, const chr *y,	/* strings to compare */
     size_t len)			/* exact length of comparison */
 {
-    return memcmp(VS(x), VS(y), len*sizeof(chr));
+    return memcmp((void*)(x), (void*)(y), len*sizeof(chr));
 }
 
 /*

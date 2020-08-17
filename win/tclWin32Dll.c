@@ -90,7 +90,7 @@ BOOL APIENTRY
 DllEntryPoint(
     HINSTANCE hInst,		/* Library instance handle. */
     DWORD reason,		/* Reason this function is being called. */
-    LPVOID reserved)		/* Not used. */
+    LPVOID reserved)
 {
     return DllMain(hInst, reason, reserved);
 }
@@ -117,10 +117,8 @@ BOOL APIENTRY
 DllMain(
     HINSTANCE hInst,		/* Library instance handle. */
     DWORD reason,		/* Reason this function is being called. */
-    LPVOID reserved)		/* Not used. */
+    TCL_UNUSED(LPVOID))
 {
-    (void)reserved;
-
     switch (reason) {
     case DLL_PROCESS_ATTACH:
 	DisableThreadLibraryCalls(hInst);
@@ -197,30 +195,6 @@ TclWinInit(
 }
 
 /*
- *----------------------------------------------------------------------
- *
- * TclWinGetPlatformId --
- *
- *	Determines whether running under NT, 95, or Win32s, to allow runtime
- *	conditional code.
- *
- * Results:
- *	The return value is always:
- *	VER_PLATFORM_WIN32_NT	Win32 on Windows NT, 2000, XP
- *
- * Side effects:
- *	None.
- *
- *----------------------------------------------------------------------
- */
-
-int
-TclWinGetPlatformId(void)
-{
-    return VER_PLATFORM_WIN32_NT;
-}
-
-/*
  *-------------------------------------------------------------------------
  *
  * TclWinNoBackslash --
@@ -286,26 +260,6 @@ TclWinEncodingsCleanup(void)
 	dlIter = dlIter2;
     }
     Tcl_MutexUnlock(&mountPointMap);
-}
-
-/*
- *---------------------------------------------------------------------------
- *
- * TclWinResetInterfaces --
- *
- *	Called during finalization to reset us to a safe state for reuse.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	None.
- *
- *---------------------------------------------------------------------------
- */
-void
-TclWinResetInterfaces(void)
-{
 }
 
 /*
@@ -509,6 +463,8 @@ TclWinDriveLetterForVolMountPoint(
  *---------------------------------------------------------------------------
  */
 
+#if !defined(TCL_NO_DEPRECATED) && TCL_MAJOR_VERSION < 9
+#undef Tcl_WinUtfToTChar
 TCHAR *
 Tcl_WinUtfToTChar(
     const char *string,		/* Source string in UTF-8. */
@@ -517,70 +473,10 @@ Tcl_WinUtfToTChar(
     Tcl_DString *dsPtr)		/* Uninitialized or free DString in which the
 				 * converted string is stored. */
 {
-#if TCL_UTF_MAX > 4
-    Tcl_UniChar ch = 0;
-    TCHAR *w, *wString;
-    const char *p, *end;
-    int oldLength;
-#endif
-
     Tcl_DStringInit(dsPtr);
-    if (!string) {
-	return NULL;
-    }
-#if TCL_UTF_MAX > 4
-
-    if (len < 0) {
-	len = strlen(string);
-    }
-
-    /*
-     * Unicode string length in Tcl_UniChars will be <= UTF-8 string length in
-     * bytes.
-     */
-
-    oldLength = Tcl_DStringLength(dsPtr);
-
-    Tcl_DStringSetLength(dsPtr,
-	    oldLength + (int) ((len + 1) * sizeof(TCHAR)));
-    wString = (TCHAR *) (Tcl_DStringValue(dsPtr) + oldLength);
-
-    w = wString;
-    p = string;
-    end = string + len - 4;
-    while (p < end) {
-	p += TclUtfToUniChar(p, &ch);
-	if (ch > 0xFFFF) {
-	    *w++ = (WCHAR) (0xD800 + ((ch -= 0x10000) >> 10));
-	    *w++ = (WCHAR) (0xDC00 | (ch & 0x3FF));
-	} else {
-	    *w++ = ch;
-	}
-    }
-    end += 4;
-    while (p < end) {
-	if (Tcl_UtfCharComplete(p, end-p)) {
-	    p += TclUtfToUniChar(p, &ch);
-	} else {
-	    ch = UCHAR(*p++);
-	}
-	if (ch > 0xFFFF) {
-	    *w++ = (WCHAR) (0xD800 + ((ch -= 0x10000) >> 10));
-	    *w++ = (WCHAR) (0xDC00 | (ch & 0x3FF));
-	} else {
-	    *w++ = ch;
-	}
-    }
-    *w = '\0';
-    Tcl_DStringSetLength(dsPtr,
-	    oldLength + ((char *) w - (char *) wString));
-
-    return wString;
-#else
-    return (TCHAR *)Tcl_UtfToUniCharDString(string, len, dsPtr);
-#endif
+    return (TCHAR *)Tcl_UtfToWCharDString(string, len, dsPtr);
 }
-
+#undef Tcl_WinTCharToUtf
 char *
 Tcl_WinTCharToUtf(
     const TCHAR *string,	/* Source string in Unicode. */
@@ -589,52 +485,10 @@ Tcl_WinTCharToUtf(
     Tcl_DString *dsPtr)		/* Uninitialized or free DString in which the
 				 * converted string is stored. */
 {
-#if TCL_UTF_MAX > 4
-    const WCHAR *w, *wEnd;
-    char *p, *result;
-    int oldLength, blen = 1;
-#endif
-
     Tcl_DStringInit(dsPtr);
-    if (!string) {
-	return NULL;
-    }
-    if (len < 0) {
-	len = wcslen((WCHAR *)string);
-    } else {
-	len /= 2;
-    }
-#if TCL_UTF_MAX > 4
-    oldLength = Tcl_DStringLength(dsPtr);
-    Tcl_DStringSetLength(dsPtr, oldLength + (len + 1) * 4);
-    result = Tcl_DStringValue(dsPtr) + oldLength;
-
-    p = result;
-    wEnd = (WCHAR *)string + len;
-    for (w = (WCHAR *)string; w < wEnd; ) {
-	if (!blen && ((*w & 0xFC00) != 0xDC00)) {
-	    /* Special case for handling high surrogates. */
-	    p += Tcl_UniCharToUtf(-1, p);
-	}
-	blen = Tcl_UniCharToUtf(*w, p);
-	p += blen;
-	if ((*w >= 0xD800) && (blen < 3)) {
-	    /* Indication that high surrogate is handled */
-	    blen = 0;
-	}
-	w++;
-    }
-    if (!blen) {
-	/* Special case for handling high surrogates. */
-	p += Tcl_UniCharToUtf(-1, p);
-    }
-    Tcl_DStringSetLength(dsPtr, oldLength + (p - result));
-
-    return result;
-#else
-    return Tcl_UniCharToUtfDString((Tcl_UniChar *)string, len, dsPtr);
-#endif
+    return Tcl_WCharToUtfDString((WCHAR *)string, len >> 1, dsPtr);
 }
+#endif /* !defined(TCL_NO_DEPRECATED) */
 
 /*
  *------------------------------------------------------------------------
@@ -656,8 +510,8 @@ Tcl_WinTCharToUtf(
 
 int
 TclWinCPUID(
-    unsigned int index,		/* Which CPUID value to retrieve. */
-    unsigned int *regsPtr)	/* Registers after the CPUID. */
+    int index,		/* Which CPUID value to retrieve. */
+    int *regsPtr)	/* Registers after the CPUID. */
 {
     int status = TCL_ERROR;
 

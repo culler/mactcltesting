@@ -19,11 +19,8 @@ if {"::tcltest" ni [namespace children]} {
 # procedure that returns the range of integers
 
 proc int_range {} {
-    for { set MIN_INT 1 } { int($MIN_INT) > 0 } {} {
-	set MIN_INT [expr { $MIN_INT << 1 }]
-    }
-    set MIN_INT [expr {int($MIN_INT)}]
-    set MAX_INT [expr { ~ $MIN_INT }]
+    set MAX_INT [expr {[format %u -2]/2}]
+    set MIN_INT [expr { ~ $MAX_INT }]
     return [list $MIN_INT $MAX_INT]
 }
 
@@ -85,8 +82,7 @@ proc testIEEE {} {
 }
 
 testConstraint ieeeFloatingPoint [testIEEE]
-testConstraint wideIs64bit \
-	[expr {(wide(0x80000000) > 0) && (wide(0x8000000000000000) < 0)}]
+testConstraint wideIs64bit [expr {wide(0x8000000000000000) < 0}]
 
 test scan-1.1 {BuildCharSet, CharInSet} {
     list [scan foo {%[^o]} x] $x
@@ -557,8 +553,13 @@ test scan-5.19 {bigint scanning invalid} -setup {
     set a {};
 } -body {
     list [scan "207698809136909011942886895" \
-	    %llu a] $a
-} -returnCodes 1 -result {unsigned bignum scans are invalid}
+           %llu a] $a
+} -result {1 207698809136909011942886895}
+test scan-5.20 {ignore digit separators} -setup {
+    set a {}; set b {}; set c {};
+} -body {
+    list [scan "10_23_45" %d_%d_%d a b c] $a $b $c
+} -result {3 10 23 45}
 
 test scan-6.1 {floating-point scanning} -setup {
     set a {}; set b {}; set c {}; set d {}
@@ -604,6 +605,11 @@ test scan-6.8 {floating-point scanning} -setup {
 } -body {
     list [scan "4.6 5.2" "%f %f %f %f" a b c d] $a $b $c $d
 } -result {2 4.6 5.2 {} {}}
+test scan-6.8 {disallow diget separator in floating-point} -setup {
+    set a {}; set b {}; set c {};
+} -body {
+    list [scan "3.14_2.35_98.6" %f_%f_%f a b c ] $a $b $c
+} -result {3 3.14 2.35 98.6}
 
 test scan-7.1 {string and character scanning} -setup {
     set a {}; set b {}; set c {}; set d {}

@@ -97,13 +97,54 @@ SpinLockLockInit(void)
 	Tcl_Panic("SpinLockLockInit: no spinlock API available");
     }
 }
-#define SpinLockLock(p) 	lockLock(p)
-#define SpinLockUnlock(p)	lockUnlock(p)
-#define SpinLockTry(p)		lockTry(p)
-#else
-#define SpinLockLock(p) 	OSSpinLockLock(p)
-#define SpinLockUnlock(p)	OSSpinLockUnlock(p)
-#define SpinLockTry(p)		OSSpinLockTry(p)
+
+/*
+ * Wrappers so that we get warnings in just one small part of this file.
+ */
+
+static inline void
+SpinLockLock(
+    VOLATILE OSSpinLock *lock)
+{
+    lockLock(lock);
+}
+static inline void
+SpinLockUnlock(
+    VOLATILE OSSpinLock *lock)
+{
+    lockUnlock(lock);
+}
+static inline bool
+SpinLockTry(
+    VOLATILE OSSpinLock *lock)
+{
+    return lockTry(lock);
+}
+
+#else /* !HAVE_WEAK_IMPORT */
+
+/*
+ * Wrappers so that we get warnings in just one small part of this file.
+ */
+
+static inline void
+SpinLockLock(
+    OSSpinLock *lock)
+{
+    OSSpinLockLock(lock);
+}
+static inline void
+SpinLockUnlock(
+    OSSpinLock *lock)
+{
+    OSSpinLockUnlock(lock);
+}
+static inline bool
+SpinLockTry(
+    OSSpinLock *lock)
+{
+    return OSSpinLockTry(lock);
+}
 #endif /* HAVE_WEAK_IMPORT */
 #define SPINLOCK_INIT		OS_SPINLOCK_INIT
 
@@ -113,12 +154,34 @@ SpinLockLockInit(void)
  */
 
 typedef uint32_t OSSpinLock;
-extern void		_spin_lock(OSSpinLock *lock);
-extern void		_spin_unlock(OSSpinLock *lock);
-extern int		_spin_lock_try(OSSpinLock *lock);
-#define SpinLockLock(p) 	_spin_lock(p)
-#define SpinLockUnlock(p)	_spin_unlock(p)
-#define SpinLockTry(p)		_spin_lock_try(p)
+
+static inline void
+SpinLockLock(
+    OSSpinLock *lock)
+{
+    extern void _spin_lock(OSSpinLock *lock);
+
+    _spin_lock(lock);
+}
+
+static inline void
+SpinLockUnlock(
+    OSSpinLock *lock)
+{
+    extern void _spin_unlock(OSSpinLock *lock);
+
+    _spin_unlock(lock);
+}
+
+static inline int
+SpinLockTry(
+    OSSpinLock *lock)
+{
+    extern int _spin_lock_try(OSSpinLock *lock);
+
+    return _spin_lock_try(lock);
+}
+
 #define SPINLOCK_INIT		0
 
 #pragma GCC diagnostic pop
@@ -428,8 +491,7 @@ static CFStringRef tclEventsOnlyRunLoopMode = NULL;
  */
 
 static void		StartNotifierThread(void);
-static void		NotifierThreadProc(ClientData clientData)
-			    __attribute__ ((__noreturn__));
+static TCL_NORETURN void NotifierThreadProc(ClientData clientData);
 static int		FileHandlerEventProc(Tcl_Event *evPtr, int flags);
 static void		TimerWakeUp(CFRunLoopTimerRef timer, void *info);
 static void		QueueFileEvents(void *info);
@@ -918,8 +980,8 @@ Tcl_SetTimer(
 
 static void
 TimerWakeUp(
-    CFRunLoopTimerRef timer,
-    void *info)
+    TCL_UNUSED(CFRunLoopTimerRef),
+    TCL_UNUSED(ClientData))
 {
 }
 
@@ -1437,7 +1499,7 @@ QueueFileEvents(
 
 static void
 UpdateWaitingListAndServiceEvents(
-    CFRunLoopObserverRef observer,
+    TCL_UNUSED(CFRunLoopObserverRef),
     CFRunLoopActivity activity,
     void *info)
 {
@@ -1800,9 +1862,9 @@ TclUnixWaitForFile(
  *----------------------------------------------------------------------
  */
 
-static void
+static TCL_NORETURN void
 NotifierThreadProc(
-    ClientData clientData)	/* Not used. */
+    TCL_UNUSED(ClientData))
 {
     ThreadSpecificData *tsdPtr;
     fd_set readableMask, writableMask, exceptionalMask;

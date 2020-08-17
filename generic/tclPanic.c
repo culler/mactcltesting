@@ -23,8 +23,8 @@
  * procedure.
  */
 
-#if defined(__CYGWIN__)
-static TCL_NORETURN Tcl_PanicProc *panicProc = tclWinDebugPanic;
+#if defined(__CYGWIN__) || (defined(_WIN32) && (defined(TCL_NO_DEPRECATED) || TCL_MAJOR_VERSION > 8))
+static TCL_NORETURN1 Tcl_PanicProc *panicProc = tclWinDebugPanic;
 #else
 static TCL_NORETURN1 Tcl_PanicProc *panicProc = NULL;
 #endif
@@ -51,13 +51,14 @@ Tcl_SetPanicProc(
 {
 #if defined(_WIN32)
     /* tclWinDebugPanic only installs if there is no panicProc yet. */
-    if ((proc != tclWinDebugPanic) || (panicProc == NULL))
+    if (((Tcl_PanicProc *)proc != tclWinDebugPanic) || (panicProc == NULL))
 #elif defined(__CYGWIN__)
     if (proc == NULL)
 	panicProc = tclWinDebugPanic;
     else
 #endif
     panicProc = proc;
+    Tcl_InitSubsystems();
 }
 
 /*
@@ -140,8 +141,6 @@ Tcl_PanicVA(
  *
  *----------------------------------------------------------------------
  */
-
-/* ARGSUSED */
 
 /*
  * The following comment is here so that Coverity's static analizer knows that

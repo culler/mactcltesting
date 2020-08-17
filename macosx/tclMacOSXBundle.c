@@ -12,6 +12,7 @@
  */
 
 #include "tclPort.h"
+#include "tclInt.h"
 
 #ifdef HAVE_COREFOUNDATION
 #include <CoreFoundation/CoreFoundation.h>
@@ -162,6 +163,7 @@ OpenResourceMap(
  *----------------------------------------------------------------------
  */
 
+#if !defined(TCL_NO_DEPRECATED) && (TCL_MAJOR_VERSION < 9)
 #undef Tcl_MacOSXOpenBundleResources
 int
 Tcl_MacOSXOpenBundleResources(
@@ -174,6 +176,7 @@ Tcl_MacOSXOpenBundleResources(
     return Tcl_MacOSXOpenVersionedBundleResources(interp, bundleName, NULL,
 	    hasResourceFile, maxPathLen, libraryPath);
 }
+#endif
 
 /*
  *----------------------------------------------------------------------
@@ -198,7 +201,7 @@ Tcl_MacOSXOpenBundleResources(
 
 int
 Tcl_MacOSXOpenVersionedBundleResources(
-    Tcl_Interp *interp,
+    TCL_UNUSED(Tcl_Interp *),
     const char *bundleName,
     const char *bundleVersion,
     int hasResourceFile,

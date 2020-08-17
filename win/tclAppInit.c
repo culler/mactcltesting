@@ -87,17 +87,18 @@ MODULE_SCOPE int TCL_LOCAL_MAIN_HOOK(int *argc, TCHAR ***argv);
 int
 main(
     int argc,			/* Number of command-line arguments. */
-    char *dummy[])		/* Not used. */
+    char **argv1)
 {
     TCHAR **argv;
+    TCHAR *p;
 #else
 int
 _tmain(
     int argc,			/* Number of command-line arguments. */
     TCHAR *argv[])		/* Values of command-line arguments. */
 {
-#endif
     TCHAR *p;
+#endif
 
     /*
      * Set up the default locale to be standard "C" locale so parsing is
@@ -111,6 +112,7 @@ _tmain(
      * Get our args from the c-runtime. Ignore command line.
      */
 
+    (void)argv1;
     setargv(&argc, &argv);
 #endif
 
@@ -126,6 +128,9 @@ _tmain(
 
 #ifdef TCL_LOCAL_MAIN_HOOK
     TCL_LOCAL_MAIN_HOOK(&argc, &argv);
+#elif !defined(_WIN32) || defined(UNICODE)
+    /* This doesn't work on Windows without UNICODE */
+    TclZipfs_AppHook(&argc, &argv);
 #endif
 
     Tcl_Main(argc, argv, TCL_LOCAL_APPINIT);
@@ -265,10 +270,10 @@ setargv(
     }
 
     /* Make sure we don't call ckalloc through the (not yet initialized) stub table */
-    #undef Tcl_Alloc
-    #undef Tcl_DbCkalloc
+#   undef Tcl_Alloc
+#   undef Tcl_DbCkalloc
 
-    argSpace = ckalloc(size * sizeof(char *)
+    argSpace = (TCHAR *)ckalloc(size * sizeof(char *)
 	    + (_tcslen(cmdLine) * sizeof(TCHAR)) + sizeof(TCHAR));
     argv = (TCHAR **) argSpace;
     argSpace += size * (sizeof(char *)/sizeof(TCHAR));

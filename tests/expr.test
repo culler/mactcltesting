@@ -10,25 +10,20 @@
 # See the file "license.terms" for information on usage and redistribution
 # of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 
-if {[lsearch [namespace children] ::tcltest] == -1} {
-    package require tcltest 2.1
+if {"::tcltest" ni [namespace children]} {
+   package require tcltest 2.1
     namespace import -force ::tcltest::*
 }
 
 ::tcltest::loadTestedCommands
 catch [list package require -exact Tcltest [info patchlevel]]
 
-testConstraint testmathfunctions [expr {
-    ([catch {expr T1()} msg] != 1) || ($msg ne {invalid command name "tcl::mathfunc::T1"})
-}]
-
 # Determine if "long int" type is a 32 bit number and if the wide
 # type is a 64 bit number on this machine.
 
-testConstraint longIs32bit [expr {int(0x80000000) < 0}]
-testConstraint longIs64bit [expr {int(0x8000000000000000) < 0}]
-testConstraint wideIs64bit \
-	[expr {(wide(0x80000000) > 0) && (wide(0x8000000000000000) < 0)}]
+testConstraint longIs32bit [expr {$tcl_platform(wordSize) == 4}]
+testConstraint longIs64bit [expr {$tcl_platform(wordSize) == 8}]
+testConstraint wideIs64bit [expr {wide(0x8000000000000000) < 0}]
 
 # Big test for correct ordering of data in [expr]
 
@@ -138,7 +133,7 @@ proc do_twelve_days {} {
     unset xxx
     return $result
 }
-
+
 # start of tests
 
 catch {unset a b i x}
@@ -416,17 +411,34 @@ test expr-8.34 {expr edge cases} -body {
 test expr-8.35 {expr edge cases} -body {
     expr {1ea}
 } -returnCodes error -match glob -result *
+test expr-8.36 {CompileEqualtyExpr: string comparison ops} {
+    set x 012
+    set y 0x0
+    list [expr {$x < $y}] [expr {$x lt $y}] [expr {$x lt $x}]
+} {0 1 0}
+test expr-8.37 {CompileEqualtyExpr: string comparison ops} {
+    set x 012
+    set y 0x0
+    list [expr {$x <= $y}] [expr {$x le $y}] [expr {$x le $x}]
+} {0 1 1}
+test expr-8.38 {CompileEqualtyExpr: string comparison ops} {
+    set x 012
+    set y 0x0
+    list [expr {$x > $y}] [expr {$x gt $y}] [expr {$x gt $x}]
+} {1 0 0}
+test expr-8.39 {CompileEqualtyExpr: string comparison ops} {
+    set x 012
+    set y 0x0
+    list [expr {$x >= $y}] [expr {$x ge $y}] [expr {$x ge $x}]
+} {1 0 1}
 
 test expr-9.1 {CompileRelationalExpr: just shift expr} {expr 3<<2} 12
 test expr-9.2 {CompileRelationalExpr: just shift expr} {expr 0xff>>2} 63
 test expr-9.3 {CompileRelationalExpr: just shift expr} {expr -1>>2} -1
 test expr-9.4 {CompileRelationalExpr: just shift expr} {expr {1<<3}} 8
-test expr-9.5a {CompileRelationalExpr: shift expr producing LONG_MIN} longIs64bit {
+test expr-9.5 {CompileRelationalExpr: shift expr producing LONG_MIN} {
     expr {int(1<<63)}
-} -9223372036854775808
-test expr-9.5b {CompileRelationalExpr: shift expr producing LONG_MIN} longIs32bit {
-    expr {int(1<<31)}
-} -2147483648
+} 9223372036854775808
 test expr-9.6 {CompileRelationalExpr: error in shift expr} -body {
     expr x>>3
 } -returnCodes error -match glob -result *
@@ -685,41 +697,6 @@ test expr-15.5 {CompileMathFuncCall: too few arguments} -body {
 test expr-15.6 {CompileMathFuncCall: missing ')'} -body {
     expr sin(1
 } -returnCodes error -match glob -result *
-test expr-15.7 {CompileMathFuncCall: call registered math function} {testmathfunctions} {
-    expr 2*T1()
-} 246
-test expr-15.8 {CompileMathFuncCall: call registered math function} {testmathfunctions} {
-    expr T2()*3
-} 1035
-test expr-15.9 {CompileMathFuncCall: call registered math function} {testmathfunctions} {
-    expr T3(21, 37)
-} 37
-test expr-15.10 {CompileMathFuncCall: call registered math function} {testmathfunctions} {
-    expr T3(21.2, 37)
-} 37.0
-test expr-15.11 {CompileMathFuncCall: call registered math function} {testmathfunctions} {
-    expr T3(-21.2, -17.5)
-} -17.5
-test expr-15.12 {ExprCallMathFunc: call registered math function} {testmathfunctions} {
-    expr T3(21, wide(37))
-} 37
-test expr=15.13 {ExprCallMathFunc: call registered math function} {testmathfunctions} {
-    expr T3(wide(21), 37)
-} 37
-test expr=15.14 {ExprCallMathFunc: call registered math function} {testmathfunctions} {
-    expr T3(wide(21), wide(37))
-} 37
-test expr-15.15 {ExprCallMathFunc: call registered math function} {testmathfunctions} {
-    expr T3(21.0, wide(37))
-} 37.0
-test expr-15.16 {ExprCallMathFunc: call registered math function} {testmathfunctions} {
-    expr T3(wide(21), 37.0)
-} 37.0
-test expr-15.17 {ExprCallMathFunc: non-numeric arg} -constraints {
-    testmathfunctions
-} -body {
-    expr T3(0,"a")
-} -returnCodes error -result {argument to math function didn't have numeric value}
 
 
 test expr-16.1 {GetToken: checks whether integer token starting with "0x" (e.g., "0x$") is invalid} {
@@ -752,7 +729,7 @@ test expr-18.1 {expr and conversion of operands to numbers} {
     catch {expr int($x)}
     expr {$x}
 } 11
-test expr-18.2 {whitespace strings should not be == 0 (buggy strtod)} {
+test expr-18.2 {whitespace strings should not be == 0 (buggy strtol/strtoul)} {
     expr {" "}
 } { }
 
@@ -1438,14 +1415,14 @@ test expr-23.74.3 {INST_EXPON: Bug 2798543} {
     expr {(-14)**17 == (-14)**65553}
 } 0
 
-	
+
 # Some compilers get this wrong; ensure that we work around it correctly
 test expr-24.1 {expr edge cases; shifting} {expr int(5)>>32} 0
 test expr-24.2 {expr edge cases; shifting} {expr int(5)>>63} 0
 test expr-24.3 {expr edge cases; shifting} {expr wide(5)>>32} 0
 test expr-24.4 {expr edge cases; shifting} {expr wide(5)>>63} 0
-test expr-24.5 {expr edge cases; shifting} longIs32bit {expr int(5<<32)} 0
-test expr-24.6 {expr edge cases; shifting} longIs32bit {expr int(5<<63)} 0
+test expr-24.5 {expr edge cases; shifting} {expr int(5<<32)} 21474836480
+test expr-24.6 {expr edge cases; shifting} {expr int(5<<63)} 46116860184273879040
 test expr-24.7 {expr edge cases; shifting} {expr wide(5)<<32} 21474836480
 test expr-24.8 {expr edge cases; shifting} {expr wide(10<<63)} 0
 test expr-24.9 {expr edge cases; shifting} {expr 5>>32} 0
@@ -5786,7 +5763,7 @@ test expr-32.1 {expr mod basics} {
     0 1 0 3 3 \
     0 -1 0 -1 -2 \
     ]
-        
+
 test expr-32.2 {expr div basics} {
     set mod_nums [list \
         {-3 1} {-3 2} {-3 3} {-3 4} {-3 5} \
@@ -5848,7 +5825,7 @@ test expr-32.9 {bignum regression} {
     expr {0%-(1+(1<<63))}
 } 0
 
-test expr-33.1 {parse largest long value} longIs32bit {
+test expr-33.1 {parse largest long value} {
     set max_long_str 2147483647
     set max_long_hex "0x7FFFFFFF "
 
@@ -5862,7 +5839,7 @@ test expr-33.1 {parse largest long value} longIs32bit {
         [expr {$max_long + 0}] \
         [expr {2147483647 + 0}] \
         [expr {$max_long == $max_long_hex}] \
-        [expr {int(2147483647 + 1) < 0}] \
+        [expr {int(2147483647 + 1) > 0}] \
 
 } {2147483647 2147483647 2147483647 2147483647 1 1}
 test expr-33.2 {parse smallest long value} longIs32bit {
@@ -5882,7 +5859,7 @@ test expr-33.2 {parse smallest long value} longIs32bit {
         [expr {$min_long + 0}] \
         [expr {-2147483648 + 0}] \
         [expr {$min_long == $min_long_hex}] \
-        [expr {int(-2147483648 - 1) == 0x7FFFFFFF}] \
+        [expr {int(-2147483648 - 1) == -0x80000001}] \
 
 } {-2147483648 -2147483648 -2147483648 -2147483648 1 1}
 test expr-33.3 {parse largest wide value} wideIs64bit {
@@ -5962,17 +5939,17 @@ test expr-34.11 {expr edge cases} {
 test expr-34.12 {expr edge cases} {
     expr {$min % -2}
 } {0}
-test expr-34.13 {expr edge cases} longIs32bit {
+test expr-34.13 {expr edge cases} {
     expr {int($min / -1)}
-} {-2147483648}
+} {2147483648}
 test expr-34.14 {expr edge cases} {
     expr {$min % -1}
 } {0}
-test expr-34.15 {expr edge cases} longIs32bit {
-    expr {int($min * -1)}
+test expr-34.15 {expr edge cases} {
+    expr {-int($min * -1)}
 } $min
-test expr-34.16 {expr edge cases} longIs32bit {
-    expr {int(-$min)}
+test expr-34.16 {expr edge cases} {
+    expr {-int(-$min)}
 } $min
 test expr-34.17 {expr edge cases} {
     expr {$min / 1}
@@ -6759,8 +6736,8 @@ test expr-39.8 {Tcl_ExprLongObj handles overflows} testexprlongobj {
     testexprlongobj -0x80000000
 } {This is a result: -2147483648}
 test expr-39.9 {Tcl_ExprLongObj handles overflows} {testexprlongobj longIs32bit} {
-    testexprlongobj -0xffffffff
-} {This is a result: 1}
+    testexprlongobj -0x7fffffff
+} {This is a result: -2147483647}
 test expr-39.10 {Tcl_ExprLongObj handles overflows} \
     -constraints {testexprlongobj longIs32bit} \
     -match glob \
@@ -6785,8 +6762,8 @@ test expr-39.14 {Tcl_ExprLongObj handles overflows} testexprlongobj {
     testexprlongobj -2147483648.
 } {This is a result: -2147483648}
 test expr-39.15 {Tcl_ExprLongObj handles overflows} {testexprlongobj longIs32bit} {
-    testexprlongobj -4294967295.
-} {This is a result: 1}
+    testexprlongobj -2147483648.
+} {This is a result: -2147483648}
 test expr-39.16 {Tcl_ExprLongObj handles overflows} \
     -constraints {testexprlongobj longIs32bit} \
     -match glob \
@@ -6794,7 +6771,7 @@ test expr-39.16 {Tcl_ExprLongObj handles overflows} \
 	list [catch {testexprlongobj 4294967296.} result] $result
     } \
     -result {1 {integer value too large to represent*}}
-    
+
 test expr-39.17 {Check that Tcl_ExprDoubleObj doesn't modify interpreter result if no error} testexprdoubleobj {
     testexprdoubleobj 4.+1.
 } {This is a result: 5.0}
@@ -6881,19 +6858,19 @@ test expr-41.13 {exponent overflow} {
 } 0.0
 test expr-41.14 {exponent overflow} {
     expr 100e-2147483651
-} 0.0 
+} 0.0
 test expr-41.15 {exponent overflow} {
     expr 1.0e-2147483648
-} 0.0 
+} 0.0
 test expr-41.16 {exponent overflow} {
     expr 1.0e-2147483649
-} 0.0 
+} 0.0
 test expr-41.17 {exponent overflow} {
     expr 1.23e-2147483646
 } 0.0
 test expr-41.18 {exponent overflow} {
     expr 1.23e-2147483647
-} 0.0 
+} 0.0
 
 test expr-41.19 {numSigDigs == 0} {
     expr 0e309
@@ -7269,16 +7246,149 @@ test expr-52.1 {
 	list [expr {$a eq {}}] [expr {$a < {}}] [expr {$a > {}}] [
 		string match {*no string representation*} [
 		::tcl::unsupported::representation $a]]
-} {0 0 1 1} 
+} {0 0 1 1}
 
-
-
-# cleanup
-if {[info exists a]} {
-    unset a
+foreach func {isfinite isinf isnan isnormal issubnormal} {
+    test expr-53.1.$func {float classification: basic arg handling} -body {
+	expr ${func}()
+    } -returnCodes error -result "too few arguments for math function \"$func\""
+    test expr-53.2.$func {float classification: basic arg handling} -body {
+	expr ${func}(1,2)
+    } -returnCodes error -result "too many arguments for math function \"$func\""
+    test expr-53.3.$func {float classification: basic arg handling} -body {
+	expr ${func}(true)
+    } -returnCodes error -result {expected number but got "true"}
+    test expr-53.4.$func {float classification: basic arg handling} -body {
+	expr ${func}("gorp")
+    } -returnCodes error -result {expected number but got "gorp"}
+    test expr-53.5.$func {float classification: basic arg handling} -body {
+	expr ${func}(1.0)
+    } -match glob -result *
+    test expr-53.6.$func {float classification: basic arg handling} -body {
+	expr ${func}(0x123)
+    } -match glob -result *
 }
-catch {unset min}
-catch {unset max}
+
+test expr-54.0 {float classification: isfinite} {expr {isfinite(1.0)}} 1
+test expr-54.1 {float classification: isfinite} {expr {isfinite(-1.0)}} 1
+test expr-54.2 {float classification: isfinite} {expr {isfinite(0.0)}} 1
+test expr-54.3 {float classification: isfinite} {expr {isfinite(-0.0)}} 1
+test expr-54.4 {float classification: isfinite} {expr {isfinite(1/Inf)}} 1
+test expr-54.5 {float classification: isfinite} {expr {isfinite(-1/Inf)}} 1
+test expr-54.6 {float classification: isfinite} {expr {isfinite(1e-314)}} 1
+test expr-54.7 {float classification: isfinite} {expr {isfinite(inf)}} 0
+test expr-54.8 {float classification: isfinite} {expr {isfinite(-inf)}} 0
+test expr-54.9 {float classification: isfinite} {expr {isfinite(NaN)}} 0
+
+test expr-55.0 {float classification: isinf} {expr {isinf(1.0)}} 0
+test expr-55.1 {float classification: isinf} {expr {isinf(-1.0)}} 0
+test expr-55.2 {float classification: isinf} {expr {isinf(0.0)}} 0
+test expr-55.3 {float classification: isinf} {expr {isinf(-0.0)}} 0
+test expr-55.4 {float classification: isinf} {expr {isinf(1/Inf)}} 0
+test expr-55.5 {float classification: isinf} {expr {isinf(-1/Inf)}} 0
+test expr-55.6 {float classification: isinf} {expr {isinf(1e-314)}} 0
+test expr-55.7 {float classification: isinf} {expr {isinf(inf)}} 1
+test expr-55.8 {float classification: isinf} {expr {isinf(-inf)}} 1
+test expr-55.9 {float classification: isinf} {expr {isinf(NaN)}} 0
+
+test expr-56.0 {float classification: isnan} {expr {isnan(1.0)}} 0
+test expr-56.1 {float classification: isnan} {expr {isnan(-1.0)}} 0
+test expr-56.2 {float classification: isnan} {expr {isnan(0.0)}} 0
+test expr-56.3 {float classification: isnan} {expr {isnan(-0.0)}} 0
+test expr-56.4 {float classification: isnan} {expr {isnan(1/Inf)}} 0
+test expr-56.5 {float classification: isnan} {expr {isnan(-1/Inf)}} 0
+test expr-56.6 {float classification: isnan} {expr {isnan(1e-314)}} 0
+test expr-56.7 {float classification: isnan} {expr {isnan(inf)}} 0
+test expr-56.8 {float classification: isnan} {expr {isnan(-inf)}} 0
+test expr-56.9 {float classification: isnan} {expr {isnan(NaN)}} 1
+
+test expr-57.0 {float classification: isnormal} {expr {isnormal(1.0)}} 1
+test expr-57.1 {float classification: isnormal} {expr {isnormal(-1.0)}} 1
+test expr-57.2 {float classification: isnormal} {expr {isnormal(0.0)}} 0
+test expr-57.3 {float classification: isnormal} {expr {isnormal(-0.0)}} 0
+test expr-57.4 {float classification: isnormal} {expr {isnormal(1/Inf)}} 0
+test expr-57.5 {float classification: isnormal} {expr {isnormal(-1/Inf)}} 0
+test expr-57.6 {float classification: isnormal} {expr {isnormal(1e-314)}} 0
+test expr-57.7 {float classification: isnormal} {expr {isnormal(inf)}} 0
+test expr-57.8 {float classification: isnormal} {expr {isnormal(-inf)}} 0
+test expr-57.9 {float classification: isnormal} {expr {isnormal(NaN)}} 0
+
+test expr-58.0 {float classification: issubnormal} {expr {issubnormal(1.0)}} 0
+test expr-58.1 {float classification: issubnormal} {expr {issubnormal(-1.0)}} 0
+test expr-58.2 {float classification: issubnormal} {expr {issubnormal(0.0)}} 0
+test expr-58.3 {float classification: issubnormal} {expr {issubnormal(-0.0)}} 0
+test expr-58.4 {float classification: issubnormal} {expr {issubnormal(1/Inf)}} 0
+test expr-58.5 {float classification: issubnormal} {expr {issubnormal(-1/Inf)}} 0
+test expr-58.6 {float classification: issubnormal} {expr {issubnormal(1e-314)}} 1
+test expr-58.7 {float classification: issubnormal} {expr {issubnormal(inf)}} 0
+test expr-58.8 {float classification: issubnormal} {expr {issubnormal(-inf)}} 0
+test expr-58.9 {float classification: issubnormal} {expr {issubnormal(NaN)}} 0
+
+test expr-59.0 {float classification: fpclassify} {fpclassify 1.0} normal
+test expr-59.1 {float classification: fpclassify} {fpclassify -1.0} normal
+test expr-59.2 {float classification: fpclassify} {fpclassify 0.0} zero
+test expr-59.3 {float classification: fpclassify} {fpclassify -0.0} zero
+test expr-59.4 {float classification: fpclassify} {fpclassify [expr 1/Inf]} zero
+test expr-59.5 {float classification: fpclassify} {fpclassify [expr -1/Inf]} zero
+test expr-59.6 {float classification: fpclassify} {fpclassify 1e-314} subnormal
+test expr-59.7 {float classification: fpclassify} {fpclassify inf} infinite
+test expr-59.8 {float classification: fpclassify} {fpclassify -inf} infinite
+test expr-59.9 {float classification: fpclassify} {fpclassify NaN} nan
+test expr-59.10 {float classification: fpclassify} -returnCodes error -body {
+    fpclassify
+} -result {wrong # args: should be "fpclassify floatValue"}
+test expr-59.11 {float classification: fpclassify} -returnCodes error -body {
+    fpclassify a b
+} -result {wrong # args: should be "fpclassify floatValue"}
+test expr-59.12 {float classification: fpclassify} -returnCodes error -body {
+    fpclassify gorp
+} -result {expected number but got "gorp"}
+
+test expr-60.1 {float classification: basic arg handling} -body {
+    expr isunordered()
+} -returnCodes error -result {too few arguments for math function "isunordered"}
+test expr-60.2 {float classification: basic arg handling} -body {
+    expr isunordered(1)
+} -returnCodes error -result {too few arguments for math function "isunordered"}
+test expr-60.3 {float classification: basic arg handling} -body {
+    expr {isunordered(1, 2, 3)}
+} -returnCodes error -result {too many arguments for math function "isunordered"}
+test expr-60.4 {float classification: basic arg handling} -body {
+    expr {isunordered(true, 1.0)}
+} -returnCodes error -result {expected number but got "true"}
+test expr-60.5 {float classification: basic arg handling} -body {
+    expr {isunordered("gorp", 1.0)}
+} -returnCodes error -result {expected number but got "gorp"}
+test expr-60.6 {float classification: basic arg handling} -body {
+    expr {isunordered(0x123, 1.0)}
+} -match glob -result *
+test expr-60.7 {float classification: basic arg handling} -body {
+    expr {isunordered(1.0, true)}
+} -returnCodes error -result {expected number but got "true"}
+test expr-60.8 {float classification: basic arg handling} -body {
+    expr {isunordered(1.0, "gorp")}
+} -returnCodes error -result {expected number but got "gorp"}
+test expr-60.9 {float classification: basic arg handling} -body {
+    expr {isunordered(1.0, 0x123)}
+} -match glob -result *
+
+# Big matrix of comparisons, but it's just a binary isinf()
+set values {1.0 -1.0 0.0 -0.0 1e-314 Inf -Inf NaN}
+set results {0 0 0 0 0 0 0 1}
+set ctr 0
+foreach v1 $values r1 $results {
+    foreach v2 $values r2 $results {
+	test expr-61.[incr ctr] "float classification: isunordered($v1,$v2)" {
+	    expr {isunordered($v1, $v2)}
+	} [expr {$r1 || $r2}]
+    }
+}
+unset -nocomplain values results ctr
+
+# cleanup
+unset -nocomplain a
+unset -nocomplain min
+unset -nocomplain max
 ::tcltest::cleanupTests
 return
 

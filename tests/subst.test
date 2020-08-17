@@ -11,7 +11,7 @@
 # See the file "license.terms" for information on usage and redistribution
 # of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 
-if {[lsearch [namespace children] ::tcltest] == -1} {
+if {"::tcltest" ni [namespace children]} {
     package require tcltest 2.1
     namespace import -force ::tcltest::*
 }
@@ -166,7 +166,7 @@ test subst-8.6 {return in a subst} -returnCodes error -body {
     subst "foo \[return {x}; bogus code bar"
 } -result {missing close-bracket}
 test subst-8.7 {return in a subst, parse error} -body {
-    subst {foo [return {x} ; set a {}"" ; stuff] bar} 
+    subst {foo [return {x} ; set a {}"" ; stuff] bar}
 } -returnCodes error -result {extra characters after close-brace}
 test subst-8.8 {return in a subst, parse error} -body {
     subst {foo [return {x} ; set bar baz ; set a {}"" ; stuff] bar}

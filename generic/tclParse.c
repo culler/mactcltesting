@@ -19,12 +19,7 @@
 
 /*
  * The following table provides parsing information about each possible 8-bit
- * character. The table is designed to be referenced with either signed or
- * unsigned characters, so it has 384 entries. The first 128 entries
- * correspond to negative character values, the next 256 correspond to
- * positive character values. The last 128 entries are identical to the first
- * 128. The table is always indexed with a 128-byte offset (the 128th entry
- * corresponds to a character value of 0).
+ * character. The table is designed to be referenced with unsigned characters.
  *
  * The macro CHAR_TYPE is used to index into the table and return information
  * about its character argument. The following return values are defined.
@@ -44,42 +39,6 @@
  */
 
 const char tclCharTypeTable[] = {
-    /*
-     * Negative character values, from -128 to -1:
-     */
-
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
-    TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,      TYPE_NORMAL,
 
     /*
      * Positive character values, from 0-127:
@@ -167,6 +126,8 @@ static int		ParseTokens(const char *src, int numBytes, int mask,
 			    int flags, Tcl_Parse *parsePtr);
 static int		ParseWhiteSpace(const char *src, int numBytes,
 			    int *incompletePtr, char *typePtr);
+static int		ParseAllWhiteSpace(const char *src, int numBytes,
+			    int *incompletePtr);
 static int		ParseHex(const char *src, int numBytes,
 			    int *resultPtr);
 
@@ -236,19 +197,19 @@ Tcl_ParseCommand(
 				 * NULL, then no error message is provided. */
     const char *start,		/* First character of string containing one or
 				 * more Tcl commands. */
-    register int numBytes,	/* Total number of bytes in string. If < 0,
+    int numBytes,	/* Total number of bytes in string. If < 0,
 				 * the script consists of all bytes up to the
 				 * first null character. */
     int nested,			/* Non-zero means this is a nested command:
 				 * close bracket should be considered a
 				 * command terminator. If zero, then close
 				 * bracket has no special meaning. */
-    register Tcl_Parse *parsePtr)
+    Tcl_Parse *parsePtr)
 				/* Structure to fill in with information about
 				 * the parsed command; any previous
 				 * information in the structure is ignored. */
 {
-    register const char *src;	/* Points to current character in the
+    const char *src;	/* Points to current character in the
 				 * command. */
     char type;			/* Result returned by CHAR_TYPE(*src). */
     Tcl_Token *tokenPtr;	/* Pointer to token being filled in. */
@@ -300,8 +261,42 @@ Tcl_ParseCommand(
      */
 
     parsePtr->commandStart = src;
+    type = CHAR_TYPE(*src);
+    scanned = 1;	/* Can't have missing whitepsace before first word. */
     while (1) {
 	int expandWord = 0;
+
+	/* Are we at command termination? */
+
+	if ((numBytes == 0) || (type & terminators) != 0) {
+	    parsePtr->term = src;
+	    parsePtr->commandSize = src + (numBytes != 0)
+		    - parsePtr->commandStart;
+	    return TCL_OK;
+	}
+
+	/* Are we missing white space after previous word? */
+
+	if (scanned == 0) {
+	    if (src[-1] == '"') {
+		if (interp != NULL) {
+		    Tcl_SetObjResult(interp, Tcl_NewStringObj(
+			    "extra characters after close-quote", -1));
+		}
+		parsePtr->errorType = TCL_PARSE_QUOTE_EXTRA;
+	    } else {
+		if (interp != NULL) {
+		    Tcl_SetObjResult(interp, Tcl_NewStringObj(
+			    "extra characters after close-brace", -1));
+		}
+		parsePtr->errorType = TCL_PARSE_BRACE_EXTRA;
+	    }
+	    parsePtr->term = src;
+	error:
+	    Tcl_FreeParse(parsePtr);
+	    parsePtr->commandSize = parsePtr->end - parsePtr->commandStart;
+	    return TCL_ERROR;
+	}
 
 	/*
 	 * Create the token for the word.
@@ -312,23 +307,6 @@ Tcl_ParseCommand(
 	tokenPtr = &parsePtr->tokenPtr[wordIndex];
 	tokenPtr->type = TCL_TOKEN_WORD;
 
-	/*
-	 * Skip white space before the word. Also skip a backslash-newline
-	 * sequence: it should be treated just like white space.
-	 */
-
-	scanned = ParseWhiteSpace(src,numBytes, &parsePtr->incomplete, &type);
-	src += scanned;
-	numBytes -= scanned;
-	if (numBytes == 0) {
-	    parsePtr->term = src;
-	    break;
-	}
-	if ((type & terminators) != 0) {
-	    parsePtr->term = src;
-	    src++;
-	    break;
-	}
 	tokenPtr->start = src;
 	parsePtr->numTokens++;
 	parsePtr->numWords++;
@@ -548,52 +526,12 @@ Tcl_ParseCommand(
 	    tokenPtr->type = TCL_TOKEN_SIMPLE_WORD;
 	}
 
-	/*
-	 * Do two additional checks: (a) make sure we're really at the end of
-	 * a word (there might have been garbage left after a quoted or braced
-	 * word), and (b) check for the end of the command.
-	 */
+	/* Parse the whitespace between words. */
 
 	scanned = ParseWhiteSpace(src,numBytes, &parsePtr->incomplete, &type);
-	if (scanned) {
-	    src += scanned;
-	    numBytes -= scanned;
-	    continue;
-	}
-
-	if (numBytes == 0) {
-	    parsePtr->term = src;
-	    break;
-	}
-	if ((type & terminators) != 0) {
-	    parsePtr->term = src;
-	    src++;
-	    break;
-	}
-	if (src[-1] == '"') {
-	    if (interp != NULL) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj(
-			"extra characters after close-quote", -1));
-	    }
-	    parsePtr->errorType = TCL_PARSE_QUOTE_EXTRA;
-	} else {
-	    if (interp != NULL) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj(
-			"extra characters after close-brace", -1));
-	    }
-	    parsePtr->errorType = TCL_PARSE_BRACE_EXTRA;
-	}
-	parsePtr->term = src;
-	goto error;
+	src += scanned;
+	numBytes -= scanned;
     }
-
-    parsePtr->commandSize = src - parsePtr->commandStart;
-    return TCL_OK;
-
-  error:
-    Tcl_FreeParse(parsePtr);
-    parsePtr->commandSize = parsePtr->end - parsePtr->commandStart;
-    return TCL_ERROR;
 }
 
 /*
@@ -684,14 +622,14 @@ TclIsBareword(
 static int
 ParseWhiteSpace(
     const char *src,		/* First character to parse. */
-    register int numBytes,	/* Max number of bytes to scan. */
+    int numBytes,	/* Max number of bytes to scan. */
     int *incompletePtr,		/* Set this boolean memory to true if parsing
 				 * indicates an incomplete command. */
     char *typePtr)		/* Points to location to store character type
 				 * of character that ends run of whitespace */
 {
-    register char type = TYPE_NORMAL;
-    register const char *p = src;
+    char type = TYPE_NORMAL;
+    const char *p = src;
 
     while (1) {
 	while (numBytes && ((type = CHAR_TYPE(*p)) & TYPE_SPACE)) {
@@ -735,22 +673,31 @@ ParseWhiteSpace(
  *----------------------------------------------------------------------
  */
 
+static int
+ParseAllWhiteSpace(
+    const char *src,		/* First character to parse. */
+    int numBytes,		/* Max number of byes to scan */
+    int *incompletePtr)		/* Set true if parse is incomplete. */
+{
+    char type;
+    const char *p = src;
+
+    do {
+	int scanned = ParseWhiteSpace(p, numBytes, incompletePtr, &type);
+
+	p += scanned;
+	numBytes -= scanned;
+    } while (numBytes && (*p == '\n') && (p++, --numBytes));
+    return (p-src);
+}
+
 int
 TclParseAllWhiteSpace(
     const char *src,		/* First character to parse. */
     int numBytes)		/* Max number of byes to scan */
 {
     int dummy;
-    char type;
-    const char *p = src;
-
-    do {
-	int scanned = ParseWhiteSpace(p, numBytes, &dummy, &type);
-
-	p += scanned;
-	numBytes -= scanned;
-    } while (numBytes && (*p == '\n') && (p++, --numBytes));
-    return (p-src);
+    return ParseAllWhiteSpace(src, numBytes, &dummy);
 }
 
 /*
@@ -784,7 +731,7 @@ ParseHex(
 				 * conversion is to be written. */
 {
     int result = 0;
-    register const char *p = src;
+    const char *p = src;
 
     while (numBytes--) {
 	unsigned char digit = UCHAR(*p);
@@ -839,13 +786,13 @@ TclParseBackslash(
 				 * of bytes scanned should be written. */
     char *dst)			/* NULL, or points to buffer where the UTF-8
 				 * encoding of the backslash sequence is to be
-				 * written. At most TCL_UTF_MAX bytes will be
-				 * written there. */
+				 * written. At most 4 bytes will be written there. */
 {
-    register const char *p = src+1;
+    const char *p = src+1;
+    Tcl_UniChar unichar = 0;
     int result;
     int count;
-    char buf[TCL_UTF_MAX] = "";
+    char buf[4] = "";
 
     if (numBytes == 0) {
 	if (readPtr != NULL) {
@@ -921,7 +868,6 @@ TclParseBackslash(
 	     * No hexdigits -> This is just "u".
 	     */
 	    result = 'u';
-#if TCL_UTF_MAX > 3
 	} else if (((result & 0xFC00) == 0xD800) && (count == 6)
 		    && (p[5] == '\\') && (p[6] == 'u') && (numBytes >= 10)) {
 	    /* If high surrogate is immediately followed by a low surrogate
@@ -932,7 +878,6 @@ TclParseBackslash(
 		result = ((result & 0x3FF)<<10 | (low & 0x3FF)) + 0x10000;
 		count += count2 + 2;
 	    }
-#endif
 	}
 	break;
     case 'U':
@@ -942,11 +887,9 @@ TclParseBackslash(
 	     * No hexdigits -> This is just "U".
 	     */
 	    result = 'U';
-#if TCL_UTF_MAX > 3
-	} else if ((result & ~0x7FF) == 0xD800) {
+	} else if ((result | 0x7FF) == 0xDFFF) {
 	    /* Upper or lower surrogate, not allowed in this syntax. */
 	    result = 0xFFFD;
-#endif
 	}
 	break;
     case '\n':
@@ -992,15 +935,16 @@ TclParseBackslash(
 	 * #217987] test subst-3.2
 	 */
 
-	if (TclUCS4Complete(p, numBytes - 1)) {
-	    count = TclUtfToUCS4(p, &result) + 1;	/* +1 for '\' */
+	if (Tcl_UtfCharComplete(p, numBytes - 1)) {
+	    count = TclUtfToUniChar(p, &unichar) + 1;	/* +1 for '\' */
 	} else {
-	    char utfBytes[8];
+	    char utfBytes[4];
 
 	    memcpy(utfBytes, p, numBytes - 1);
 	    utfBytes[numBytes - 1] = '\0';
-	    count = TclUtfToUCS4(utfBytes, &result) + 1;
+	    count = TclUtfToUniChar(utfBytes, &unichar) + 1;
 	}
+	result = unichar;
 	break;
     }
 
@@ -1008,12 +952,12 @@ TclParseBackslash(
     if (readPtr != NULL) {
 	*readPtr = count;
     }
-#if TCL_UTF_MAX < 4
-    if (result > 0xFFFF) {
-    	result = 0xFFFD;
+    count = Tcl_UniCharToUtf(result, dst);
+    if ((result >= 0xD800) && (count < 3)) {
+	/* Special case for handling high surrogates. */
+	count += Tcl_UniCharToUtf(-1, dst + count);
     }
-#endif
-    return TclUCS4ToUtf(result, dst);
+    return count;
 }
 
 /*
@@ -1037,23 +981,18 @@ TclParseBackslash(
 static int
 ParseComment(
     const char *src,		/* First character to parse. */
-    register int numBytes,	/* Max number of bytes to scan. */
+    int numBytes,	/* Max number of bytes to scan. */
     Tcl_Parse *parsePtr)	/* Information about parse in progress.
 				 * Updated if parsing indicates an incomplete
 				 * command. */
 {
-    register const char *p = src;
+    const char *p = src;
+    int incomplete = parsePtr->incomplete;
 
     while (numBytes) {
-	char type;
-	int scanned;
-
-	do {
-	    scanned = ParseWhiteSpace(p, numBytes,
-		    &parsePtr->incomplete, &type);
-	    p += scanned;
-	    numBytes -= scanned;
-	} while (numBytes && (*p == '\n') && (p++,numBytes--));
+	int scanned = ParseAllWhiteSpace(p, numBytes, &incomplete);
+	p += scanned;
+	numBytes -= scanned;
 
 	if ((numBytes == 0) || (*p != '#')) {
 	    break;
@@ -1062,35 +1001,28 @@ ParseComment(
 	    parsePtr->commentStart = p;
 	}
 
+	p++;
+	numBytes--;
 	while (numBytes) {
-	    if (*p == '\\') {
-		scanned = ParseWhiteSpace(p, numBytes, &parsePtr->incomplete,
-			&type);
-		if (scanned) {
-		    p += scanned;
-		    numBytes -= scanned;
-		} else {
-		    /*
-		     * General backslash substitution in comments isn't part
-		     * of the formal spec, but test parse-15.47 and history
-		     * indicate that it has been the de facto rule. Don't
-		     * change it now.
-		     */
-
-		    TclParseBackslash(p, numBytes, &scanned, NULL);
-		    p += scanned;
-		    numBytes -= scanned;
-		}
-	    } else {
+	    if (*p == '\n') {
 		p++;
 		numBytes--;
-		if (p[-1] == '\n') {
+		break;
+	    }
+	    if (*p == '\\') {
+		p++;
+		numBytes--;
+		if (numBytes == 0) {
 		    break;
 		}
 	    }
+	    incomplete = (*p == '\n');
+	    p++;
+	    numBytes--;
 	}
 	parsePtr->commentSize = p - parsePtr->commentStart;
     }
+    parsePtr->incomplete = incomplete;
     return (p - src);
 }
 
@@ -1121,8 +1053,8 @@ ParseComment(
 
 static int
 ParseTokens(
-    register const char *src,	/* First character to parse. */
-    register int numBytes,	/* Max number of bytes to scan. */
+    const char *src,	/* First character to parse. */
+    int numBytes,	/* Max number of bytes to scan. */
     int mask,			/* Specifies when to stop parsing. The parse
 				 * stops at the first unquoted character whose
 				 * CHAR_TYPE contains any of the bits in
@@ -1213,7 +1145,7 @@ ParseTokens(
 
 	    src++;
 	    numBytes--;
-	    nestedPtr = TclStackAlloc(parsePtr->interp, sizeof(Tcl_Parse));
+	    nestedPtr = (Tcl_Parse *)TclStackAlloc(parsePtr->interp, sizeof(Tcl_Parse));
 	    while (1) {
 		const char *curEnd;
 
@@ -1400,7 +1332,7 @@ Tcl_ParseVarName(
 				 * NULL, then no error message is provided. */
     const char *start,		/* Start of variable substitution string.
 				 * First character must be "$". */
-    register int numBytes,	/* Total number of bytes in string. If < 0,
+    int numBytes,	/* Total number of bytes in string. If < 0,
 				 * the string consists of all bytes up to the
 				 * first null character. */
     Tcl_Parse *parsePtr,	/* Structure to fill in with information about
@@ -1411,7 +1343,7 @@ Tcl_ParseVarName(
 				 * reinitialize it. */
 {
     Tcl_Token *tokenPtr;
-    register const char *src;
+    const char *src;
     int varIndex;
     unsigned array;
 
@@ -1592,15 +1524,15 @@ Tcl_ParseVarName(
 const char *
 Tcl_ParseVar(
     Tcl_Interp *interp,		/* Context for looking up variable. */
-    register const char *start,	/* Start of variable substitution. First
+    const char *start,	/* Start of variable substitution. First
 				 * character must be "$". */
     const char **termPtr)	/* If non-NULL, points to word to fill in with
 				 * character just after last one in the
 				 * variable specifier. */
 {
-    register Tcl_Obj *objPtr;
+    Tcl_Obj *objPtr;
     int code;
-    Tcl_Parse *parsePtr = TclStackAlloc(interp, sizeof(Tcl_Parse));
+    Tcl_Parse *parsePtr = (Tcl_Parse *)TclStackAlloc(interp, sizeof(Tcl_Parse));
 
     if (Tcl_ParseVarName(interp, start, -1, parsePtr, 0) != TCL_OK) {
 	TclStackFree(interp, parsePtr);
@@ -1677,10 +1609,10 @@ Tcl_ParseBraces(
 				 * NULL, then no error message is provided. */
     const char *start,		/* Start of string enclosed in braces. The
 				 * first character must be {'. */
-    register int numBytes,	/* Total number of bytes in string. If < 0,
+    int numBytes,	/* Total number of bytes in string. If < 0,
 				 * the string consists of all bytes up to the
 				 * first null character. */
-    register Tcl_Parse *parsePtr,
+    Tcl_Parse *parsePtr,
 				/* Structure to fill in with information about
 				 * the string. */
     int append,			/* Non-zero means append tokens to existing
@@ -1693,7 +1625,7 @@ Tcl_ParseBraces(
 				 * successful. */
 {
     Tcl_Token *tokenPtr;
-    register const char *src;
+    const char *src;
     int startIndex, level, length;
 
     if (numBytes < 0 && start) {
@@ -1818,7 +1750,7 @@ Tcl_ParseBraces(
      */
 
     {
-	register int openBrace = 0;
+	int openBrace = 0;
 
 	while (--src > start) {
 	    switch (*src) {
@@ -1878,10 +1810,10 @@ Tcl_ParseQuotedString(
 				 * NULL, then no error message is provided. */
     const char *start,		/* Start of the quoted string. The first
 				 * character must be '"'. */
-    register int numBytes,	/* Total number of bytes in string. If < 0,
+    int numBytes,	/* Total number of bytes in string. If < 0,
 				 * the string consists of all bytes up to the
 				 * first null character. */
-    register Tcl_Parse *parsePtr,
+    Tcl_Parse *parsePtr,
 				/* Structure to fill in with information about
 				 * the string. */
     int append,			/* Non-zero means append tokens to existing
@@ -2079,7 +2011,7 @@ TclSubstParse(
 
 		Tcl_Token *tokenPtr;
 		const char *lastTerm = parsePtr->term;
-		Tcl_Parse *nestedPtr =
+		Tcl_Parse *nestedPtr = (Tcl_Parse *)
 			TclStackAlloc(interp, sizeof(Tcl_Parse));
 
 		while (TCL_OK ==
@@ -2221,7 +2153,7 @@ TclSubstTokens(
 
     if (isLiteral) {
 	maxNumCL = NUM_STATIC_POS;
-	clPosition = ckalloc(maxNumCL * sizeof(int));
+	clPosition = (int *)ckalloc(maxNumCL * sizeof(int));
     }
 
     adjust = 0;
@@ -2230,7 +2162,7 @@ TclSubstTokens(
 	Tcl_Obj *appendObj = NULL;
 	const char *append = NULL;
 	int appendByteLength = 0;
-	char utfCharBytes[TCL_UTF_MAX] = "";
+	char utfCharBytes[4] = "";
 
 	switch (tokenPtr->type) {
 	case TCL_TOKEN_TEXT:
@@ -2266,12 +2198,12 @@ TclSubstTokens(
 		    if (result == 0) {
 			clPos = 0;
 		    } else {
-			Tcl_GetStringFromObj(result, &clPos);
+			TclGetStringFromObj(result, &clPos);
 		    }
 
 		    if (numCL >= maxNumCL) {
 			maxNumCL *= 2;
-			clPosition = ckrealloc(clPosition,
+			clPosition = (int *)ckrealloc(clPosition,
 				maxNumCL * sizeof(int));
 		    }
 		    clPosition[numCL] = clPos;
@@ -2542,7 +2474,7 @@ TclObjCommandComplete(
 				 * check. */
 {
     int length;
-    const char *script = Tcl_GetStringFromObj(objPtr, &length);
+    const char *script = TclGetStringFromObj(objPtr, &length);
 
     return CommandComplete(script, length);
 }

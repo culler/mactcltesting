@@ -11,7 +11,7 @@
 # See the file "license.terms" for information on usage and redistribution
 # of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 
-if {[lsearch [namespace children] ::tcltest] == -1} {
+if {"::tcltest" ni [namespace children]} {
     package require tcltest 2
     namespace import -force ::tcltest::*
 }
@@ -36,7 +36,7 @@ testConstraint thread [expr {0 == [catch {package require Thread 2.7-}]}]
 # can access this variable.
 
 set helperscript {
-    if {[lsearch [namespace children] ::tcltest] == -1} {
+    if {"::tcltest" ni [namespace children]} {
 	package require tcltest 2
 	namespace import -force ::tcltest::*
     }
@@ -1320,7 +1320,7 @@ proc inthread {chan script args} {
     # forwarded channel operations.
 
     set ::tres ""
-    thread::send -async $tid {	
+    thread::send -async $tid {
 	after 50
 	catch {s} res;	# This runs the script, 's' was defined at (*)
 	thread::send -async $mid [list set ::tres $res]

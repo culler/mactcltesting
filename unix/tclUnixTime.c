@@ -11,7 +11,6 @@
  */
 
 #include "tclInt.h"
-#include <locale.h>
 #if defined(TCL_WIDE_CLICKS) && defined(MAC_OSX_TCL)
 #include <mach/mach_time.h>
 #endif
@@ -22,8 +21,9 @@
  * variable is the key to this buffer.
  */
 
+#ifndef TCL_NO_DEPRECATED
 static Tcl_ThreadDataKey tmKey;
-typedef struct ThreadSpecificData {
+typedef struct {
     struct tm gmtime_buf;
     struct tm localtime_buf;
 } ThreadSpecificData;
@@ -45,6 +45,8 @@ static char *lastTZ = NULL;	/* Holds the last setting of the TZ
 
 static void		SetTZIfNecessary(void);
 static void		CleanupMemory(ClientData clientData);
+#endif /* TCL_NO_DEPRECATED */
+
 static void		NativeScaleTime(Tcl_Time *timebuf,
 			    ClientData clientData);
 static void		NativeGetTime(Tcl_Time *timebuf,
@@ -56,7 +58,7 @@ static void		NativeGetTime(Tcl_Time *timebuf,
 
 Tcl_GetTimeProc *tclGetTimeProcPtr = NativeGetTime;
 Tcl_ScaleTimeProc *tclScaleTimeProcPtr = NativeScaleTime;
-ClientData tclTimeClientData = NULL;
+void *tclTimeClientData = NULL;
 
 /*
  *----------------------------------------------------------------------
@@ -334,6 +336,7 @@ Tcl_GetTime(
  *----------------------------------------------------------------------
  */
 
+#ifndef TCL_NO_DEPRECATED
 struct tm *
 TclpGetDate(
     const time_t *time,
@@ -423,6 +426,7 @@ TclpLocaltime(
 
     return &tsdPtr->localtime_buf;
 }
+#endif /* TCL_NO_DEPRECATED */
 
 /*
  *----------------------------------------------------------------------
@@ -504,8 +508,8 @@ Tcl_QueryTimeProc(
 
 static void
 NativeScaleTime(
-    Tcl_Time *timePtr,
-    ClientData clientData)
+    TCL_UNUSED(Tcl_Time *),
+    TCL_UNUSED(ClientData))
 {
     /* Native scale is 1:1. Nothing is done */
 }
@@ -530,7 +534,7 @@ NativeScaleTime(
 static void
 NativeGetTime(
     Tcl_Time *timePtr,
-    ClientData clientData)
+    TCL_UNUSED(ClientData))
 {
     struct timeval tv;
 
@@ -557,6 +561,7 @@ NativeGetTime(
  *----------------------------------------------------------------------
  */
 
+#ifndef TCL_NO_DEPRECATED
 static void
 SetTZIfNecessary(void)
 {
@@ -573,7 +578,7 @@ SetTZIfNecessary(void)
 	} else {
 	    ckfree(lastTZ);
 	}
-	lastTZ = ckalloc(strlen(newTZ) + 1);
+	lastTZ = (char *)ckalloc(strlen(newTZ) + 1);
 	strcpy(lastTZ, newTZ);
     }
     Tcl_MutexUnlock(&tmMutex);
@@ -598,10 +603,11 @@ SetTZIfNecessary(void)
 
 static void
 CleanupMemory(
-    ClientData ignored)
+    TCL_UNUSED(ClientData))
 {
     ckfree(lastTZ);
 }
+#endif /* TCL_NO_DEPRECATED */
 
 /*
  * Local Variables:

@@ -81,7 +81,7 @@ static int lexescape(struct vars *);
 static int lexdigits(struct vars *, int, int, int);
 static int brenext(struct vars *, pchr);
 static void skip(struct vars *);
-static chr newline(NOPARMS);
+static chr newline(void);
 static chr chrnamed(struct vars *, const chr *, const chr *, pchr);
 /* === regc_color.c === */
 static void initcm(struct vars *, struct colormap *);
@@ -205,11 +205,11 @@ struct vars {
     int cflags;			/* copy of compile flags */
     int lasttype;		/* type of previous token */
     int nexttype;		/* type of next token */
-    chr nextvalue;		/* value (if any) of next token */
+    int nextvalue;		/* value (if any) of next token */
     int lexcon;			/* lexical context type (see lex.c) */
     int nsubexp;		/* subexpression count */
     struct subre **subs;	/* subRE pointer vector */
-    size_t nsubs;		/* length of vector */
+    int nsubs;			/* length of vector */
     struct subre *sub10[10];	/* initial vector, enough for most */
     struct nfa *nfa;		/* the NFA */
     struct colormap *cm;	/* character color map */
@@ -287,8 +287,7 @@ compile(
 {
     AllocVars(v);
     struct guts *g;
-    int i;
-    size_t j;
+    int i, j;
     FILE *debug = (flags&REG_PROGRESS) ? stdout : NULL;
 #define	CNOERR()	{ if (ISERR()) return freev(v, v->err); }
 
@@ -341,13 +340,13 @@ compile(
     re->re_info = 0;		/* bits get set during parse */
     re->re_csize = sizeof(chr);
     re->re_guts = NULL;
-    re->re_fns = VS(&functions);
+    re->re_fns = (void*)(&functions);
 
     /*
      * More complex setup, malloced things.
      */
 
-    re->re_guts = VS(MALLOC(sizeof(struct guts)));
+    re->re_guts = (void*)(MALLOC(sizeof(struct guts)));
     if (re->re_guts == NULL) {
 	return freev(v, REG_ESPACE);
     }
@@ -433,7 +432,7 @@ compile(
      * Can sacrifice main NFA now, so use it as work area.
      */
 
-    (DISCARD) optimize(v->nfa, debug);
+    (void) optimize(v->nfa, debug);
     CNOERR();
     makesearch(v, v->nfa);
     CNOERR();
@@ -476,10 +475,10 @@ moresubs(
     int wanted)			/* want enough room for this one */
 {
     struct subre **p;
-    size_t n;
+    int n;
 
-    assert(wanted > 0 && (size_t)wanted >= v->nsubs);
-    n = (size_t)wanted * 3 / 2 + 1;
+    assert(wanted > 0 && wanted >= v->nsubs);
+    n = wanted * 3 / 2 + 1;
     if (v->subs == v->sub10) {
 	p = (struct subre **) MALLOC(n * sizeof(struct subre *));
 	if (p != NULL) {
@@ -498,7 +497,7 @@ moresubs(
 	*p = NULL;
     }
     assert(v->nsubs == n);
-    assert((size_t)wanted < v->nsubs);
+    assert(wanted < v->nsubs);
 }
 
 /*
@@ -512,7 +511,7 @@ freev(
     struct vars *v,
     int err)
 {
-    register int ret;
+    int ret;
 
     if (v->re != NULL) {
 	rfree(v->re);
@@ -809,7 +808,7 @@ parseqatom(
     atom = NULL;
     assert(lp->nouts == 0);	/* must string new code */
     assert(rp->nins == 0);	/* between lp and rp */
-    subno = 0;			/* just to shut lint up */
+    subno = 0;
 
     /*
      * An atom or constraint...
@@ -953,10 +952,10 @@ parseqatom(
 	if (cap) {
 	    v->nsubexp++;
 	    subno = v->nsubexp;
-	    if ((size_t)subno >= v->nsubs) {
+	    if (subno >= v->nsubs) {
 		moresubs(v, subno);
 	    }
-	    assert((size_t)subno < v->nsubs);
+	    assert(subno < v->nsubs);
 	} else {
 	    atomtype = PLAIN;	/* something that's not '(' */
 	}
@@ -1900,10 +1899,10 @@ nfatree(
     assert(t != NULL && t->begin != NULL);
 
     if (t->left != NULL) {
-	(DISCARD) nfatree(v, t->left, f);
+	(void) nfatree(v, t->left, f);
     }
     if (t->right != NULL) {
-	(DISCARD) nfatree(v, t->right, f);
+	(void) nfatree(v, t->right, f);
     }
 
     return nfanode(v, t, f);

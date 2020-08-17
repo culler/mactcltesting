@@ -50,7 +50,8 @@ NewNativeObj(
     Tcl_DString ds;
 
 #ifdef UNICODE
-    Tcl_WinTCharToUtf(string, -1, &ds);
+    Tcl_DStringInit(&ds);
+    Tcl_WCharToUtfDString(string, -1, &ds);
 #else
     Tcl_ExternalToUtfDString(NULL, (char *) string, -1, &ds);
 #endif
@@ -95,7 +96,7 @@ typedef enum {
     PROMPT_CONTINUE		/* Print prompt for command continuation */
 } PromptType;
 
-typedef struct InteractiveState {
+typedef struct {
     Tcl_Channel input;		/* The standard input channel from which lines
 				 * are read. */
     int tty;			/* Non-zero means standard input is a
@@ -229,7 +230,7 @@ Tcl_SourceRCFile(
     const char *fileName;
     Tcl_Channel chan;
 
-    fileName = Tcl_GetVar(interp, "tcl_rcFileName", TCL_GLOBAL_ONLY);
+    fileName = Tcl_GetVar2(interp, "tcl_rcFileName", NULL, TCL_GLOBAL_ONLY);
     if (fileName != NULL) {
 	Tcl_Channel c;
 	const char *fullName;
@@ -266,7 +267,7 @@ Tcl_SourceRCFile(
 
 /*----------------------------------------------------------------------
  *
- * Tcl_Main, Tcl_MainEx --
+ * Tcl_MainEx --
  *
  *	Main program for tclsh and most other Tcl-based applications.
  *
@@ -445,7 +446,7 @@ Tcl_MainEx(
      * Get a new value for tty if anyone writes to ::tcl_interactive
      */
 
-    Tcl_LinkVar(interp, "tcl_interactive", (char *) &is.tty, TCL_LINK_BOOLEAN);
+    Tcl_LinkVar(interp, "tcl_interactive", &is.tty, TCL_LINK_BOOLEAN);
     is.input = Tcl_GetStdChannel(TCL_STDIN);
     while ((is.input != NULL) && !Tcl_InterpDeleted(interp)) {
 	mainLoopProc = TclGetMainLoop();
@@ -515,7 +516,7 @@ Tcl_MainEx(
 	     * error messages troubles deeper in, so lop it back off.
 	     */
 
-	    Tcl_GetStringFromObj(is.commandPtr, &length);
+	    TclGetStringFromObj(is.commandPtr, &length);
 	    Tcl_SetObjLength(is.commandPtr, --length);
 	    code = Tcl_RecordAndEvalObj(interp, is.commandPtr,
 		    TCL_EVAL_GLOBAL);
@@ -532,7 +533,7 @@ Tcl_MainEx(
 	    } else if (is.tty) {
 		resultPtr = Tcl_GetObjResult(interp);
 		Tcl_IncrRefCount(resultPtr);
-		Tcl_GetStringFromObj(resultPtr, &length);
+		TclGetStringFromObj(resultPtr, &length);
 		chan = Tcl_GetStdChannel(TCL_STDOUT);
 		if ((length > 0) && chan) {
 		    Tcl_WriteObj(chan, resultPtr);
@@ -617,21 +618,6 @@ Tcl_MainEx(
 
     Tcl_Exit(exitCode);
 }
-
-#if (TCL_MAJOR_VERSION == 8) && !defined(UNICODE)
-#undef Tcl_Main
-extern DLLEXPORT void
-Tcl_Main(
-    int argc,			/* Number of arguments. */
-    char **argv,		/* Array of argument strings. */
-    Tcl_AppInitProc *appInitProc)
-				/* Application-specific initialization
-				 * function to call after most initialization
-				 * but before starting to execute commands. */
-{
-    Tcl_MainEx(argc, argv, appInitProc, Tcl_CreateInterp());
-}
-#endif /* TCL_MAJOR_VERSION == 8 && !UNICODE */
 
 #if !defined(_WIN32) || defined(UNICODE)
 
@@ -745,14 +731,13 @@ TclFullFinalizationRequested(void)
  *----------------------------------------------------------------------
  */
 
-    /* ARGSUSED */
 static void
 StdinProc(
     ClientData clientData,	/* The state of interactive cmd line */
-    int mask)			/* Not used. */
+    TCL_UNUSED(int) /*mask*/)
 {
     int code, length;
-    InteractiveState *isPtr = clientData;
+    InteractiveState *isPtr = (InteractiveState *)clientData;
     Tcl_Channel chan = isPtr->input;
     Tcl_Obj *commandPtr = isPtr->commandPtr;
     Tcl_Interp *interp = isPtr->interp;
@@ -791,7 +776,7 @@ StdinProc(
 	goto prompt;
     }
     isPtr->prompt = PROMPT_START;
-    Tcl_GetStringFromObj(commandPtr, &length);
+    TclGetStringFromObj(commandPtr, &length);
     Tcl_SetObjLength(commandPtr, --length);
 
     /*
@@ -822,7 +807,7 @@ StdinProc(
 	chan = Tcl_GetStdChannel(TCL_STDOUT);
 
 	Tcl_IncrRefCount(resultPtr);
-	Tcl_GetStringFromObj(resultPtr, &length);
+	TclGetStringFromObj(resultPtr, &length);
 	if ((length > 0) && (chan != NULL)) {
 	    Tcl_WriteObj(chan, resultPtr);
 	    Tcl_WriteChars(chan, "\n", 1);
@@ -924,7 +909,7 @@ static void
 FreeMainInterp(
     ClientData clientData)
 {
-    Tcl_Interp *interp = clientData;
+    Tcl_Interp *interp = (Tcl_Interp *)clientData;
 
     /*if (TclInExit()) return;*/
 
