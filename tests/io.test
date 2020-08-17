@@ -6871,7 +6871,7 @@ test io-50.5 {testing handler deletion vs reentrant calls} -constraints testchan
     close $f
 } -result [list {del calling recursive} {del deleted notcalled} \
 	{del deleted myself} {del after recursive}]
-test io-50.6 {testing handler deletion vs reentrant calls} -constraints testchannelevent -setup {
+test io-50.6 {testing handler deletion vs reentrant calls} -constraints {testchannelevent testservicemode} -setup {
     file delete $path(test1)
 } -body {
     set f [open $path(test1) w]
@@ -6879,6 +6879,7 @@ test io-50.6 {testing handler deletion vs reentrant calls} -constraints testchan
     proc first {f} {
 	variable u
 	variable z
+	variable done
 	if {"$u" == "toplevel"} {
 	    lappend z "first called"
 	    set u first
@@ -6886,6 +6887,7 @@ test io-50.6 {testing handler deletion vs reentrant calls} -constraints testchan
 	    vwait z
 	    after cancel $timer
 	    lappend z "first after toplevel"
+	    set done 1
 	} else {
 	    lappend z "first called not toplevel"
 	}
@@ -6907,12 +6909,18 @@ test io-50.6 {testing handler deletion vs reentrant calls} -constraints testchan
     }
     set z ""
     set u toplevel
+    set done 0
     testservicemode 0
     set f [open $path(test1) r]
     testchannelevent $f add readable [namespace code [list second $f]]
     testchannelevent $f add readable [namespace code [list first $f]]
     testservicemode 1
     update
+    if {!$done} {
+	set $timer2 [after 200 lappend done timeout]
+	vwait done
+	after cancel timer2
+    }
     set z
 } -cleanup {
     close $f

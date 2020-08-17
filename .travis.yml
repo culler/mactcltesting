@@ -49,6 +49,11 @@ jobs:
       script: *mactest
 before_install:
   - cd ${BUILD_DIR}
+  - git clone https://github.com/libtom/libtommath.git
+  - cd libtommath
+  - make
+  - make install
+  - cd ..
 install:
   - mkdir "$HOME/install dir"
   - ./configure ${CFGOPT} "--prefix=$HOME/install dir" || (cat config.log && exit 1)
